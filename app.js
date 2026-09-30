@@ -106,24 +106,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const gold = styles.getPropertyValue('--accent-gold').trim() || '#d4af37';
     const highlight = styles.getPropertyValue('--highlight').trim() || '#38bdf8';
 
-    // Base Circle
+    // Base background track ring
     ctx.beginPath();
     ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
     ctx.lineWidth = 4;
     ctx.stroke();
 
-    // Arc Progress
+    // Correct 360° Solar Arc mapping: 0° starts strictly at 12 o'clock, moving clockwise
     const startAngle = -Math.PI / 2;
     const endAngle = startAngle + ((longitude / 360) * 2 * Math.PI);
 
     ctx.beginPath();
-    ctx.arc(cx, cy, radius, startAngle, endAngle);
+    ctx.arc(cx, cy, radius, startAngle, endAngle, false);
     ctx.strokeStyle = gold;
     ctx.lineWidth = 4;
     ctx.stroke();
 
-    // Node
+    // Leading edge solar position node
     const nodeX = cx + radius * Math.cos(endAngle);
     const nodeY = cy + radius * Math.sin(endAngle);
 
@@ -147,7 +147,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Safe Start Loop
   update();
   setInterval(update, 1000);
 });
