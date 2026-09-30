@@ -24,7 +24,7 @@ const ROMAN_ARCS = [
 ];
 
 // Default Observer Coordinates: Vilnius, Lithuania (54.6872° N, 25.2798° E)
-let observerCoords = { lat: 54.6872, lon: 25.2798, source: "Default (Vilnius)" };
+let observerCoords = { lat: 54.6872, lon: 25.2798, source: "Vilnius, LT" };
 
 // --- Keplerian Solver ---
 function solveKepler(M, e) {
@@ -63,27 +63,22 @@ function getDynamicParameters(now) {
   return { nuDeg, e, c, x_len, y0, obliquityDeg: EARTH.obliquityDeg };
 }
 
-// --- Geolocational Horizon Engine (Solar Elevation, Azimuth, Sunrise/Sunset) ---
+// --- Geolocational Horizon Engine ---
 function calculateSolarPosition(now, lat, lon) {
   const startOfYear = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
   const dayOfYear = (now - startOfYear) / 86400000;
 
-  // Solar Declination Angle (δ)
   const declinationRad = 23.44 * (Math.PI / 180) * Math.sin((2 * Math.PI / 365.25) * (dayOfYear - 81));
-
-  // Local Hour Angle (H)
   const utcHours = now.getUTCHours() + now.getUTCMinutes() / 60 + now.getUTCSeconds() / 3600;
-  const lst = (utcHours * 15 + lon) % 360; // Local Sidereal Time in degrees
+  const lst = (utcHours * 15 + lon) % 360; 
   const hourAngleRad = (lst - 180) * (Math.PI / 180);
 
   const latRad = lat * (Math.PI / 180);
 
-  // Elevation (α)
   const sinEl = Math.sin(declinationRad) * Math.sin(latRad) + 
                 Math.cos(declinationRad) * Math.cos(latRad) * Math.cos(hourAngleRad);
   const elevationDeg = Math.asin(Math.max(-1, Math.min(1, sinEl))) * (180 / Math.PI);
 
-  // Azimuth (A)
   const cosAz = (Math.sin(declinationRad) - Math.sin(latRad) * sinEl) / 
                 (Math.cos(latRad) * Math.cos(Math.asin(sinEl)));
   let azimuthDeg = Math.acos(Math.max(-1, Math.min(1, cosAz))) * (180 / Math.PI);
@@ -98,9 +93,7 @@ function calculateSunriseSunset(now, lat, lon) {
   const declinationRad = 23.44 * (Math.PI / 180) * Math.sin((2 * Math.PI / 365.25) * (dayOfYear - 81));
   const latRad = lat * (Math.PI / 180);
 
-  // Atmospheric refraction correction (-0.833°)
   const h0 = -0.833 * (Math.PI / 180);
-
   const cosH = (Math.sin(h0) - Math.sin(latRad) * Math.sin(declinationRad)) / 
                (Math.cos(latRad) * Math.cos(declinationRad));
 
@@ -110,7 +103,6 @@ function calculateSunriseSunset(now, lat, lon) {
   const hourAngleDeg = Math.acos(cosH) * (180 / Math.PI);
   const hourAngleHours = hourAngleDeg / 15;
 
-  // Local Solar Noon
   const tzOffsetHours = -now.getTimezoneOffset() / 60;
   const solarNoonUtc = 12 - (lon / 15);
   let solarNoonLocal = solarNoonUtc + tzOffsetHours;
@@ -130,8 +122,8 @@ function calculateSunriseSunset(now, lat, lon) {
   }
 
   return {
-    sunrise: formatDecimalHours(sunriseLocalHours),
-    sunset: formatDecimalHours(sunsetLocalHours),
+    sunrise: formatDecimalHours(sunriseLocalHours).substring(0, 5),
+    sunset: formatDecimalHours(sunsetLocalHours).substring(0, 5),
     noon: formatDecimalHours(solarNoonLocal)
   };
 }
@@ -142,10 +134,9 @@ function safeSetText(id, text) {
 }
 
 function updateApp() {
-  const now = new Date(); // Pure live local clock
+  const now = new Date();
   const params = getDynamicParameters(now);
 
-  // LOCAL TIME ALIGNMENT (Mid-night to Local Device Timezone)
   const startOfLocalToday = new Date(
     now.getFullYear(), 
     now.getMonth(), 
@@ -162,12 +153,11 @@ function updateApp() {
     hour12: false 
   });
   const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "Local";
-  const timeLabelText = `${localTimeString} (${userTz})`;
 
   const customSecRatio = BASE_UNITS_PER_DAY / EARTH.solDurationSec;
   const baseUnitsToday = (elapsedSISecondsToday * customSecRatio) / (params.x_len / params.y0);
 
-  // 360-Day Solar Cycle Calendar Engine
+  // Calendar Breakdown
   const elapsedSISecondsEpoch = (now.getTime() - EARTH.epochStartUtc) / 1000;
   const totalCustomUnits = elapsedSISecondsEpoch / params.x_len;
   const totalDays = Math.floor(totalCustomUnits / BASE_UNITS_PER_DAY);
@@ -176,30 +166,28 @@ function updateApp() {
   const month = Math.floor(dayOfYear360 / 30) + 1;
   const day = (dayOfYear360 % 30) + 1;
 
-  // Unit Breakdown (° ' '' ''')
+  // Sub-unit Breakdown
   const totalSubUnitsToday = baseUnitsToday * TIERS_PER_BEAT;
   const arcDegree = Math.floor(baseUnitsToday / (PRIMES_PER_ARC * BEATS_PER_PRIME));
   const primeArc = Math.floor((baseUnitsToday % (PRIMES_PER_ARC * BEATS_PER_PRIME)) / BEATS_PER_PRIME);
   const beatArc = Math.floor(baseUnitsToday % BEATS_PER_PRIME);
   const tierArc = Math.floor(totalSubUnitsToday % TIERS_PER_BEAT);
 
-  // Render Calendar Grid
+  // Render UI
   safeSetText('cal-year', year);
   safeSetText('cal-month', String(month).padStart(2, '0'));
   safeSetText('cal-day', String(day).padStart(2, '0'));
   renderCalendarGrid(day);
 
-  // Render Primary Digital Display
   safeSetText(
     'custom-time-display', 
     `${String(arcDegree).padStart(2, '0')}° ${String(primeArc).padStart(2, '0')}' ${String(beatArc).padStart(2, '0')}'' ${String(tierArc).padStart(2, '0')}'''`
   );
 
-  // Render Geolocational Horizon Data & Solar Times
   const solarPos = calculateSolarPosition(now, observerCoords.lat, observerCoords.lon);
   const sunTimes = calculateSunriseSunset(now, observerCoords.lat, observerCoords.lon);
 
-  safeSetText('geo-coords-text', `${observerCoords.lat.toFixed(2)}°, ${observerCoords.lon.toFixed(2)}° (${observerCoords.source})`);
+  safeSetText('geo-coords-text', observerCoords.source);
   safeSetText('geo-sunrise-text', sunTimes.sunrise);
   safeSetText('geo-sunset-text', sunTimes.sunset);
   safeSetText('geo-noon-text', sunTimes.noon);
@@ -217,13 +205,12 @@ function updateApp() {
   }
   safeSetText('geo-state-text', horizonState);
 
-  // Render Kepler Metrics
   safeSetText('m-nu', `${params.nuDeg.toFixed(2)}°`);
   safeSetText('m-xlen', `${params.x_len.toFixed(5)} s`);
   safeSetText('m-e', params.e.toFixed(6));
   safeSetText('m-obliquity', `${params.obliquityDeg.toFixed(2)}°`);
 
-  safeSetText('utc-time', timeLabelText);
+  safeSetText('utc-time', `${localTimeString} (${userTz})`);
 
   const drift = ((params.x_len - params.y0) / params.y0) * 100;
   safeSetText('drift-rate', `${drift > 0 ? '+' : ''}${drift.toFixed(3)}%`);
@@ -249,72 +236,90 @@ function renderCalendarGrid(currentDay) {
   }
 }
 
+// --- Minimalist Astronomical Instrument Canvas Clock ---
 function drawAnalogClock(arc, prime, beat) {
   const canvas = document.getElementById('clock-canvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
   
-  const cx = canvas.width / 2;
-  const cy = canvas.height / 2;
-  const radius = cx - 12;
+  const dpr = window.devicePixelRatio || 1;
+  if (!canvas.dataset.scaled) {
+    canvas.width = 240 * dpr;
+    canvas.height = 240 * dpr;
+    canvas.style.width = '240px';
+    canvas.style.height = '240px';
+    canvas.dataset.scaled = 'true';
+  }
 
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.save();
+  ctx.scale(dpr, dpr);
 
+  const cx = 120;
+  const cy = 120;
+  const radius = 100;
+
+  ctx.clearRect(0, 0, 240, 240);
+
+  // Outer Precision Ring
   ctx.beginPath();
   ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
-  ctx.fillStyle = '#0f172a';
-  ctx.fill();
-  ctx.strokeStyle = '#818cf8';
-  ctx.lineWidth = 3;
+  ctx.strokeStyle = 'rgba(212, 175, 55, 0.3)';
+  ctx.lineWidth = 1;
   ctx.stroke();
 
-  // 72 Graduation Ticks (')
+  // Inner Subtle Ring
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius - 16, 0, 2 * Math.PI);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // 72 Prime Ticks
   for (let i = 0; i < PRIMES_PER_ARC; i++) {
     const angle = (i / PRIMES_PER_ARC) * 2 * Math.PI - Math.PI / 2;
-    const isMajor = (i % 3.6) < 1;
-    const tickLen = isMajor ? 5 : 3;
+    const isMajor = i % 3.6 < 0.1;
+    const tickLen = isMajor ? 6 : 3;
 
     ctx.beginPath();
     ctx.moveTo(cx + Math.cos(angle) * (radius - tickLen), cy + Math.sin(angle) * (radius - tickLen));
     ctx.lineTo(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius);
-    ctx.strokeStyle = isMajor ? '#9ca3af' : '#334155';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = isMajor ? 'rgba(212, 175, 55, 0.5)' : 'rgba(255, 255, 255, 0.12)';
+    ctx.lineWidth = isMajor ? 1.5 : 0.8;
     ctx.stroke();
   }
 
-  // 20 Primary Celestial Arc Marks (°)
-  ctx.font = '600 10px serif';
+  // 20 Primary Celestial Arc Marks (Roman Numerals)
+  ctx.font = '500 8px "Cinzel", serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#c7d2fe';
+  ctx.fillStyle = '#94a3b8';
 
   for (let i = 0; i < PRIMARY_ARCS; i++) {
     const angle = (i / PRIMARY_ARCS) * 2 * Math.PI - Math.PI / 2;
-
-    ctx.beginPath();
-    ctx.moveTo(cx + Math.cos(angle) * (radius - 10), cy + Math.sin(angle) * (radius - 10));
-    ctx.lineTo(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius);
-    ctx.strokeStyle = '#818cf8';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    const nx = cx + Math.cos(angle) * (radius - 20);
-    const ny = cy + Math.sin(angle) * (radius - 20);
+    const nx = cx + Math.cos(angle) * (radius - 12);
+    const ny = cy + Math.sin(angle) * (radius - 12);
     ctx.fillText(ROMAN_ARCS[i], nx, ny);
   }
 
+  // Calculate Hand Angles
   const beatAngle = (beat / BEATS_PER_PRIME) * 2 * Math.PI - Math.PI / 2;
   const primeAngle = ((prime + beat / BEATS_PER_PRIME) / PRIMES_PER_ARC) * 2 * Math.PI - Math.PI / 2;
   const arcAngle = ((arc + prime / PRIMES_PER_ARC) / PRIMARY_ARCS) * 2 * Math.PI - Math.PI / 2;
 
-  drawHand(ctx, cx, cy, arcAngle, radius * 0.45, '#f3f4f6', 4);
-  drawHand(ctx, cx, cy, primeAngle, radius * 0.65, '#818cf8', 2.5);
-  drawHand(ctx, cx, cy, beatAngle, radius * 0.82, '#10b981', 1.5);
+  // Arc Hand (Main Hour equivalent) - Gold
+  drawHand(ctx, cx, cy, arcAngle, radius * 0.48, '#d4af37', 2.5);
+  // Prime Hand (Minute equivalent) - Cyan Accent
+  drawHand(ctx, cx, cy, primeAngle, radius * 0.68, '#38bdf8', 1.5);
+  // Beat Hand (Second equivalent) - Subtle White Needle
+  drawHand(ctx, cx, cy, beatAngle, radius * 0.82, 'rgba(255, 255, 255, 0.7)', 1);
 
+  // Center Pivot Glass Stud
   ctx.beginPath();
-  ctx.arc(cx, cy, 4, 0, 2 * Math.PI);
-  ctx.fillStyle = '#10b981';
+  ctx.arc(cx, cy, 3, 0, 2 * Math.PI);
+  ctx.fillStyle = '#d4af37';
   ctx.fill();
+
+  ctx.restore();
 }
 
 function drawHand(ctx, cx, cy, angle, length, color, width) {
@@ -323,26 +328,30 @@ function drawHand(ctx, cx, cy, angle, length, color, width) {
   ctx.lineTo(cx + Math.cos(angle) * length, cy + Math.sin(angle) * length);
   ctx.strokeStyle = color;
   ctx.lineWidth = width;
+  ctx.lineCap = 'round';
   ctx.stroke();
 }
 
-// --- EVENT LISTENERS ---
+// --- GPS Handler ---
 document.addEventListener('DOMContentLoaded', () => {
   const gpsBtn = document.getElementById('request-gps-btn');
 
   if (gpsBtn) {
     gpsBtn.addEventListener('click', () => {
       if (navigator.geolocation) {
+        gpsBtn.textContent = 'Acquiring GPS...';
         navigator.geolocation.getCurrentPosition(
           (pos) => {
             observerCoords = {
               lat: pos.coords.latitude,
               lon: pos.coords.longitude,
-              source: "GPS Live"
+              source: `${pos.coords.latitude.toFixed(2)}°, ${pos.coords.longitude.toFixed(2)}° (GPS)`
             };
+            gpsBtn.textContent = 'GPS Synchronized';
           },
           () => {
-            alert("Unable to acquire GPS position. Using Vilnius default coordinates.");
+            alert("Unable to acquire GPS position. Retaining Vilnius default.");
+            gpsBtn.textContent = 'Calibrate GPS Location';
           }
         );
       }
