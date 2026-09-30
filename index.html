@@ -44,6 +44,28 @@
       <div id="custom-time-display" class="digital-time">00:00:00</div>
     </div>
 
+    <!-- Time-Travel & Simulation Controls -->
+    <div class="card">
+      <h2>Time Travel & Simulation Engine</h2>
+      <div class="control-group">
+        <label for="time-scrubber">Scrub Time Offset:</label>
+        <input type="range" id="time-scrubber" min="-180" max="180" value="0" step="1">
+        <div class="control-readout">
+          <span>Offset: <strong id="offset-days-display">0</strong> Days</span>
+          <button id="reset-time-btn" class="btn">Reset to Live Time</button>
+        </div>
+      </div>
+      <div class="control-group" style="margin-top: 12px;">
+        <label>Simulation Rate Multiplier:</label>
+        <div class="btn-group">
+          <button class="btn speed-btn active" data-speed="1">1x</button>
+          <button class="btn speed-btn" data-speed="10">10x</button>
+          <button class="btn speed-btn" data-speed="100">100x</button>
+          <button class="btn speed-btn" data-speed="1000">1000x</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Astronomical Cycles Card -->
     <div class="card">
       <h2>Astronomical Cycles</h2>
@@ -55,13 +77,17 @@
         <span>Seasonal Alignment:</span>
         <span id="astro-event-text" class="metric-value">Calculating...</span>
       </div>
+      <div class="metric-row">
+        <span>Solar Phase:</span>
+        <span id="solar-phase-text" class="metric-value">Night Sky</span>
+      </div>
     </div>
 
     <!-- Dynamic Formula Metrics Card -->
     <div class="card">
       <h2>Dynamic Formula Metrics</h2>
       <div class="metric-row">
-        <span>True Anomaly (ν):</span>
+        <span>True Anomaly (ν - Kepler):</span>
         <span id="m-nu" class="metric-value">0.00°</span>
       </div>
       <div class="metric-row">
@@ -91,6 +117,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=4.0"></script>
+  <script src="app.js?v=5.0"></script>
 </body>
 </html>
