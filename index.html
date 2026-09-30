@@ -97,31 +97,6 @@
       letter-spacing: 0.5px;
     }
 
-    /* Planet Selection Tabs */
-    .planet-selector {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 12px;
-    }
-
-    .planet-btn {
-      flex: 1;
-      background: var(--bg-color);
-      border: 1px solid var(--border-color);
-      color: var(--text-muted);
-      padding: 8px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: 600;
-      transition: all 0.2s ease;
-    }
-
-    .planet-btn.active {
-      background: var(--accent-color);
-      color: #fff;
-      border-color: var(--accent-color);
-    }
-
     /* Clock Display */
     .clock-container {
       display: flex;
@@ -173,44 +148,6 @@
       font-weight: bold;
     }
 
-    /* Controls */
-    .control-group {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    label {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-    }
-
-    input[type="range"] {
-      width: 100%;
-      accent-color: var(--accent-color);
-    }
-
-    .speed-btn-group {
-      display: flex;
-      gap: 8px;
-    }
-
-    .speed-btn {
-      flex: 1;
-      background: var(--bg-color);
-      border: 1px solid var(--border-color);
-      color: var(--text-main);
-      padding: 6px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 0.85rem;
-    }
-
-    .speed-btn.active {
-      border-color: var(--highlight);
-      color: var(--highlight);
-    }
-
     .btn {
       background-color: var(--accent-color);
       color: #fff;
@@ -249,20 +186,10 @@
 
   <header>
     <h1>Le Temps Sestrel Relatif</h1>
-    <div class="subtitle">Keplerian Celestial Mechanics & Solar Time Framework</div>
+    <div class="subtitle">Earth Solar Time Framework & Dynamic Celestial Clock</div>
   </header>
 
   <div class="container">
-
-    <!-- Planet Selector Card -->
-    <div class="card">
-      <h2>Celestial Body</h2>
-      <div class="planet-selector">
-        <button class="planet-btn active" data-planet="earth">Earth</button>
-        <button class="planet-btn" data-planet="mars">Mars</button>
-        <button class="planet-btn" data-planet="venus">Venus</button>
-      </div>
-    </div>
 
     <!-- Clock Display Card -->
     <div class="card clock-container">
@@ -282,35 +209,12 @@
       </div>
     </div>
 
-    <!-- Simulation & Offset Control -->
-    <div class="card control-group">
-      <h2>Simulation & Offset Control</h2>
-      <div>
-        <label for="time-scrubber">Orbit Offset Scrub (Days):</label>
-        <input type="range" id="time-scrubber" min="-180" max="180" value="0">
-      </div>
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
-        <label>Offset: <span id="offset-days-display" style="color: var(--highlight);">0</span> Days</label>
-        <button id="reset-time-btn" class="btn" style="padding: 4px 12px; font-size: 0.8rem;">Reset to Live Solar Coordinates</button>
-      </div>
-
-      <div style="margin-top: 10px;">
-        <label>Simulation Rate Multiplier:</label>
-        <div class="speed-btn-group" style="margin-top: 4px;">
-          <button class="speed-btn active" data-speed="1">1x</button>
-          <button class="speed-btn" data-speed="10">10x</button>
-          <button class="speed-btn" data-speed="100">100x</button>
-          <button class="speed-btn" data-speed="1000">1000x</button>
-        </div>
-      </div>
-    </div>
-
     <!-- Geolocational Horizon & Solar Times Card -->
     <div class="card">
       <h2>Geolocational Horizon & Solar Times</h2>
       <div class="metric-row">
         <span>Observer Position:</span>
-        <span id="geo-coords-text" class="metric-value">Acquiring GPS...</span>
+        <span id="geo-coords-text" class="metric-value">Vilnius, LT</span>
       </div>
       <div class="metric-row">
         <span>🌅 Sunrise:</span>
@@ -348,14 +252,14 @@
       </div>
       <div class="metric-row">
         <span>Eccentricity (e):</span>
-        <span id="m-e" class="metric-value">0.000000</span>
+        <span id="m-e" class="metric-value">0.016709</span>
       </div>
       <div class="metric-row">
         <span>Axial Obliquity:</span>
-        <span id="m-obliquity" class="metric-value">0.00°</span>
+        <span id="m-obliquity" class="metric-value">23.44°</span>
       </div>
       <div style="margin-top: 10px; border-top: 1px dashed var(--border-color); padding-top: 8px;">
-        <label style="font-size: 0.75rem;">Atomic Comparison:</label>
+        <label style="font-size: 0.75rem; color: var(--text-muted);">Atomic Comparison:</label>
         <div class="metric-row">
           <span>Local Horizon Reference:</span>
           <span id="utc-time" class="metric-value">00:00:00</span>
