@@ -76,7 +76,6 @@ header h1 {
   text-align: center;
 }
 
-/* Calendar Grid */
 .calendar-header {
   display: flex;
   justify-content: space-around;
@@ -126,7 +125,6 @@ header h1 {
   box-shadow: 0 0 8px rgba(99, 102, 241, 0.6);
 }
 
-/* Clock Display */
 .clock-container {
   display: flex;
   justify-content: center;
@@ -148,7 +146,6 @@ header h1 {
   margin-top: 8px;
 }
 
-/* Controls */
 .control-group {
   display: flex;
   flex-direction: column;
@@ -204,7 +201,6 @@ input[type="range"] {
   flex: 1;
 }
 
-/* Metrics */
 .metric-row {
   display: flex;
   justify-content: space-between;
