@@ -2,12 +2,16 @@
 const EPOCH_START_UTC = Date.UTC(2026, 0, 1, 0, 0, 0); // Jan 1, 2026
 const PERIHELION_DAY_OF_YEAR = 3;
 
-const ARCS_PER_DAY = 20;       // 20 primary arcs (°)
-const PRIMES_PER_ARC = 72;     // 72 prime units (')
-const BEATS_PER_PRIME = 72;    // 72 beats ('')
-const TOTAL_CUSTOM_SECS_PER_DAY = ARCS_PER_DAY * PRIMES_PER_ARC * BEATS_PER_PRIME; // 103,680 units/day
+const PRIMARY_ARCS = 20;         // 20 Primary Arcs (°) [10 Day / 10 Night]
+const PRIMES_PER_ARC = 72;       // 72 Primes (') per Arc
+const BEATS_PER_PRIME = 72;      // 72 Beats ('') per Prime
+const TIERS_PER_BEAT = 72;       // 72 Tiers (''') per Beat (Sub-second resolution)
 
-// Roman numerals for 20 primary solar arcs (0 / 20 at top is XX)
+// Total sub-units per day: 20 * 72 * 72 * 72 = 7,464,960
+const TOTAL_SUBUNITS_PER_DAY = PRIMARY_ARCS * PRIMES_PER_ARC * BEATS_PER_PRIME * TIERS_PER_BEAT;
+const BASE_UNITS_PER_DAY = PRIMARY_ARCS * PRIMES_PER_ARC * BEATS_PER_PRIME; // 103,680 units
+
+// Roman Numerals for 20 Primary Solar Arcs (XX at Nadir/Midnight, X at Zenith/Noon)
 const ROMAN_ARCS = [
   "XX", "I", "II", "III", "IV", "V", 
   "VI", "VII", "VIII", "IX", "X", 
@@ -63,7 +67,7 @@ function getDynamicParameters(now) {
   const c = e * Math.cos(obliquityRad);
 
   const SI_SECONDS_PER_360_YEAR = 365.25 * 86400;
-  const TOTAL_CUSTOM_SECS_PER_YEAR = 360 * TOTAL_CUSTOM_SECS_PER_DAY;
+  const TOTAL_CUSTOM_SECS_PER_YEAR = 360 * BASE_UNITS_PER_DAY;
   const y0 = SI_SECONDS_PER_360_YEAR / TOTAL_CUSTOM_SECS_PER_YEAR; 
 
   const x_len = y0 * (1 + c * Math.cos(nuRad)) / Math.pow(1 + e * Math.cos(nuRad), 2);
@@ -130,22 +134,25 @@ function updateApp() {
   }
 
   // Pure Solar Coordinate Math
-  const customSecRatio = TOTAL_CUSTOM_SECS_PER_DAY / 86400;
-  const unitsToday = (elapsedSISecondsToday * customSecRatio) / (params.x_len / params.y0);
+  const customSecRatio = BASE_UNITS_PER_DAY / 86400;
+  const baseUnitsToday = (elapsedSISecondsToday * customSecRatio) / (params.x_len / params.y0);
 
   // Calendar Math
   const elapsedSISecondsEpoch = (now.getTime() - EPOCH_START_UTC) / 1000;
   const totalCustomUnits = elapsedSISecondsEpoch / params.x_len;
-  const totalDays = Math.floor(totalCustomUnits / TOTAL_CUSTOM_SECS_PER_DAY);
+  const totalDays = Math.floor(totalCustomUnits / BASE_UNITS_PER_DAY);
   const year = Math.floor(totalDays / 360) + 1;
   const dayOfYear360 = ((totalDays % 360) + 360) % 360;
   const month = Math.floor(dayOfYear360 / 30) + 1;
   const day = (dayOfYear360 % 30) + 1;
 
-  // Breakdown into Geometric Notation (° ' '')
-  const primaryArc = Math.floor(unitsToday / (PRIMES_PER_ARC * BEATS_PER_PRIME));
-  const primeUnit = Math.floor((unitsToday % (PRIMES_PER_ARC * BEATS_PER_PRIME)) / BEATS_PER_PRIME);
-  const beatUnit = Math.floor(unitsToday % BEATS_PER_PRIME);
+  // Breakdown into 4 Celestial Tiers (° ' '' ''')
+  const totalSubUnitsToday = baseUnitsToday * TIERS_PER_BEAT;
+  
+  const arcDegree = Math.floor(baseUnitsToday / (PRIMES_PER_ARC * BEATS_PER_PRIME));
+  const primeArc = Math.floor((baseUnitsToday % (PRIMES_PER_ARC * BEATS_PER_PRIME)) / BEATS_PER_PRIME);
+  const beatArc = Math.floor(baseUnitsToday % BEATS_PER_PRIME);
+  const tierArc = Math.floor(totalSubUnitsToday % TIERS_PER_BEAT);
 
   // --- RENDER UI ---
   safeSetText('cal-year', year);
@@ -153,10 +160,10 @@ function updateApp() {
   safeSetText('cal-day', String(day).padStart(2, '0'));
   renderCalendarGrid(day);
 
-  // Pure Celestial Notation Display (° ' '')
+  // Pure Celestial Coordinate Display (° ' '' ''')
   safeSetText(
     'custom-time-display', 
-    `${String(primaryArc).padStart(2, '0')}° ${String(primeUnit).padStart(2, '0')}' ${String(beatUnit).padStart(2, '0')}''`
+    `${String(arcDegree).padStart(2, '0')}° ${String(primeArc).padStart(2, '0')}' ${String(beatArc).padStart(2, '0')}'' ${String(tierArc).padStart(2, '0')}'''`
   );
 
   safeSetText('m-nu', `${params.nuDeg.toFixed(2)}°`);
@@ -177,20 +184,19 @@ function updateApp() {
   const astroEvent = getNextAstronomicalEvent(params.nuDeg);
   safeSetText('astro-event-text', `Next: ${astroEvent.event} (${astroEvent.remainingDeg.toFixed(1)}° away)`);
 
-  // Solar Horizon Phase
-  const arcFraction = primaryArc / ARCS_PER_DAY;
-  if (arcFraction >= 0.25 && arcFraction <= 0.75) {
+  // Solar Horizon Theme Mapping (10° = Zenith / High Noon)
+  if (arcDegree >= 5 && arcDegree < 15) {
     document.body.setAttribute('data-theme', 'daylight');
-    safeSetText('solar-phase-text', '☀️ Solar Zenith Arc');
-  } else if ((arcFraction > 0.20 && arcFraction < 0.25) || (arcFraction > 0.75 && arcFraction < 0.80)) {
+    safeSetText('solar-phase-text', '☀️ Solar Zenith Arc (Day)');
+  } else if (arcDegree === 4 || arcDegree === 15) {
     document.body.setAttribute('data-theme', 'twilight');
     safeSetText('solar-phase-text', '🌅 Twilight Arc Shift');
   } else {
     document.body.removeAttribute('data-theme');
-    safeSetText('solar-phase-text', '🌌 Deep Nadir Arc');
+    safeSetText('solar-phase-text', '🌌 Nadir Arc (Night)');
   }
 
-  drawAnalogClock(primaryArc, primeUnit, beatUnit);
+  drawAnalogClock(arcDegree, primeArc, beatArc);
 
   requestAnimationFrame(updateApp);
 }
@@ -250,8 +256,8 @@ function drawAnalogClock(arc, prime, beat) {
   ctx.textBaseline = 'middle';
   ctx.fillStyle = '#c7d2fe';
 
-  for (let i = 0; i < ARCS_PER_DAY; i++) {
-    const angle = (i / ARCS_PER_DAY) * 2 * Math.PI - Math.PI / 2;
+  for (let i = 0; i < PRIMARY_ARCS; i++) {
+    const angle = (i / PRIMARY_ARCS) * 2 * Math.PI - Math.PI / 2;
 
     ctx.beginPath();
     ctx.moveTo(cx + Math.cos(angle) * (radius - 10), cy + Math.sin(angle) * (radius - 10));
@@ -268,7 +274,7 @@ function drawAnalogClock(arc, prime, beat) {
 
   const beatAngle = (beat / BEATS_PER_PRIME) * 2 * Math.PI - Math.PI / 2;
   const primeAngle = ((prime + beat / BEATS_PER_PRIME) / PRIMES_PER_ARC) * 2 * Math.PI - Math.PI / 2;
-  const arcAngle = ((arc + prime / PRIMES_PER_ARC) / ARCS_PER_DAY) * 2 * Math.PI - Math.PI / 2;
+  const arcAngle = ((arc + prime / PRIMES_PER_ARC) / PRIMARY_ARCS) * 2 * Math.PI - Math.PI / 2;
 
   drawHand(ctx, cx, cy, arcAngle, radius * 0.45, '#f3f4f6', 4);
   drawHand(ctx, cx, cy, primeAngle, radius * 0.65, '#818cf8', 2.5);
