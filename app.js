@@ -1,5 +1,5 @@
 // --- System Constants ---
-const EPOCH_START_UTC = Date.UTC(2026, 0, 1, 0, 0, 0); // Jan 1, 2026
+const EPOCH_START_UTC = Date.UTC(2026, 0, 1, 0, 0, 0); // Jan 1, 2026 00:00:00 UTC
 const PERIHELION_DAY_OF_YEAR = 3;
 
 const HOURS_PER_DAY = 20;
@@ -21,10 +21,10 @@ function getDynamicParameters(now) {
   const obliquityRad = 23.44 * (Math.PI / 180);
   const c = e * Math.cos(obliquityRad);
 
-  // Scaled y0: Maps 360 custom days across 365.25 tropical SI days
+  // Scaled baseline: 360 custom days spread across 365.25 orbital days
   const SI_SECONDS_PER_360_YEAR = 365.25 * 86400;
   const TOTAL_CUSTOM_SECS_PER_YEAR = 360 * TOTAL_CUSTOM_SECS_PER_DAY;
-  const y0 = SI_SECONDS_PER_360_YEAR / TOTAL_CUSTOM_SECS_PER_YEAR; 
+  const y0 = SI_SECONDS_PER_360_YEAR / TOTAL_CUSTOM_SECS_PER_YEAR; // ~0.845486 s
 
   const x_len = y0 * (1 + c * Math.cos(nuRad)) / Math.pow(1 + e * Math.cos(nuRad), 2);
 
@@ -35,15 +35,14 @@ function updateApp() {
   const now = new Date();
   const params = getDynamicParameters(now);
 
-  // 1. DAILY CLOCK: Calculated relative to TODAY's UTC Midnight
+  // 1. Synchronized Daily Clock: Daily phase locked to UTC 00:00:00
   const startOfUTCToday = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   const elapsedSISecondsToday = (now.getTime() - startOfUTCToday) / 1000;
   
-  // Convert 86,400 SI daily seconds into 103,680 custom daily seconds modulated by x
   const customSecRatio = TOTAL_CUSTOM_SECS_PER_DAY / 86400;
   const secondsToday = (elapsedSISecondsToday * customSecRatio) / (params.x_len / params.y0);
 
-  // 2. CALENDAR MATH: Days passed since Jan 1, 2026 Epoch
+  // 2. Calendar Math: Days passed since Jan 1, 2026 Epoch
   const elapsedSISecondsEpoch = (now.getTime() - EPOCH_START_UTC) / 1000;
   const totalCustomSeconds = elapsedSISecondsEpoch / params.x_len;
   const totalDays = Math.floor(totalCustomSeconds / TOTAL_CUSTOM_SECS_PER_DAY);
@@ -52,7 +51,7 @@ function updateApp() {
   const month = Math.floor(dayOfYear360 / 30) + 1;
   const day = (dayOfYear360 % 30) + 1;
 
-  // 3. Time Breakdown (20h / 72m / 72s)
+  // 3. Time Units (20h / 72m / 72s)
   const customHours = Math.floor(secondsToday / (MINS_PER_HOUR * SECS_PER_MIN));
   const customMins = Math.floor((secondsToday % (MINS_PER_HOUR * SECS_PER_MIN)) / SECS_PER_MIN);
   const customSecs = Math.floor(secondsToday % SECS_PER_MIN);
