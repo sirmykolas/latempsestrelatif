@@ -1,25 +1,24 @@
 // --- System Constants ---
-const EPOCH_START_UTC = new Date(Date.UTC(2026, 0, 1, 0, 0, 0)).getTime(); // Jan 1, 2026 = Year 1, Month 1, Day 1
-const PERIHELION_DAY_OF_YEAR = 3; // Approx Jan 3
+const EPOCH_START_UTC = Date.UTC(2026, 0, 1, 0, 0, 0); // Epoch: Jan 1, 2026 00:00:00 UTC
+const PERIHELION_DAY_OF_YEAR = 3; // Jan 3
 
 const HOURS_PER_DAY = 20;
 const MINS_PER_HOUR = 72;
 const SECS_PER_MIN = 72;
 const TOTAL_CUSTOM_SECS_PER_DAY = HOURS_PER_DAY * MINS_PER_HOUR * SECS_PER_MIN; // 103,680 custom secs/day
 
-// --- Formula Parameters ---
 function getDynamicParameters(now) {
   const startOfYear = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
   const dayOfYear = (now - startOfYear) / 86400000;
   
-  // True Anomaly ν (approximate based on day of year relative to Perihelion)
+  // True Anomaly ν
   const nuRad = ((dayOfYear - PERIHELION_DAY_OF_YEAR) / 365.25) * 2 * Math.PI;
   const nuDeg = ((nuRad * 180 / Math.PI) + 360) % 360;
 
   // Perturbative Eccentricity e(t)
   const e_0 = 0.0167086;
   const t_years = (now.getTime() - EPOCH_START_UTC) / (365.25 * 86400000 * 1000);
-  const e = e_0 + 0.00005 * Math.cos(2 * Math.PI * t_years / 11.86); // Jupiter cycle perturbation
+  const e = e_0 + 0.00005 * Math.cos(2 * Math.PI * t_years / 11.86);
 
   // Axial Obliquity ε = 23.44°
   const obliquityRad = 23.44 * (Math.PI / 180);
@@ -32,7 +31,6 @@ function getDynamicParameters(now) {
   return { nuDeg, e, c, x_len, y0 };
 }
 
-// --- Main Engine ---
 function updateApp() {
   const now = new Date();
   const elapsedMs = now.getTime() - EPOCH_START_UTC;
@@ -40,33 +38,36 @@ function updateApp() {
 
   const params = getDynamicParameters(now);
 
-  // Calculate accumulated custom seconds
-  const currentCustomSecondsTotal = elapsedSISeconds / params.x_len;
+  // Total custom seconds passed since Epoch
+  const totalCustomSeconds = elapsedSISeconds / params.x_len;
 
-  // Calendar Calculation (360-day year = 12 months * 30 days)
-  const totalDays = Math.floor(currentCustomSecondsTotal / TOTAL_CUSTOM_SECS_PER_DAY);
+  // Synchronized daily cycle (0 to 103,679)
+  const secondsToday = ((totalCustomSeconds % TOTAL_CUSTOM_SECS_PER_DAY) + TOTAL_CUSTOM_SECS_PER_DAY) % TOTAL_CUSTOM_SECS_PER_DAY;
+
+  // Calendar Math (360 days per year: 12 months * 30 days)
+  const totalDays = Math.floor(totalCustomSeconds / TOTAL_CUSTOM_SECS_PER_DAY);
   const year = Math.floor(totalDays / 360) + 1;
-  const dayOfYear360 = (totalDays % 360) + 360 % 360;
+  const dayOfYear360 = ((totalDays % 360) + 360) % 360;
   const month = Math.floor(dayOfYear360 / 30) + 1;
   const day = (dayOfYear360 % 30) + 1;
 
-  // Dynamic Time Calculation
-  const secondsToday = currentCustomSecondsTotal % TOTAL_CUSTOM_SECS_PER_DAY;
+  // 20h / 72m / 72s Breakdown
   const customHours = Math.floor(secondsToday / (MINS_PER_HOUR * SECS_PER_MIN));
   const customMins = Math.floor((secondsToday % (MINS_PER_HOUR * SECS_PER_MIN)) / SECS_PER_MIN);
   const customSecs = Math.floor(secondsToday % SECS_PER_MIN);
 
-  // Render Calendar UI
-  document.getElementById('cal-year').textContent = year;
-  document.getElementById('cal-month').textContent = String(month).padStart(2, '0');
-  document.getElementById('cal-day').textContent = String(day).padStart(2, '0');
-  renderCalendarGrid(day);
+  // Render UI
+  if (document.getElementById('cal-year')) {
+    document.getElementById('cal-year').textContent = year;
+    document.getElementById('cal-month').textContent = String(month).padStart(2, '0');
+    document.getElementById('cal-day').textContent = String(day).padStart(2, '0');
+    renderCalendarGrid(day);
+  }
 
-  // Render Time UI
-  const timeStr = `${String(customHours).padStart(2, '0')}:${String(customMins).padStart(2, '0')}:${String(customSecs).padStart(2, '0')}`;
-  document.getElementById('custom-time-display').textContent = timeStr;
+  document.getElementById('custom-time-display').textContent = 
+    `${String(customHours).padStart(2, '0')}:${String(customMins).padStart(2, '0')}:${String(customSecs).padStart(2, '0')}`;
 
-  // Render Metrics UI
+  // Metrics
   document.getElementById('m-nu').textContent = `${params.nuDeg.toFixed(2)}°`;
   document.getElementById('m-xlen').textContent = `${params.x_len.toFixed(5)} s`;
   document.getElementById('m-e').textContent = params.e.toFixed(6);
@@ -76,7 +77,7 @@ function updateApp() {
   const drift = ((params.x_len - params.y0) / params.y0) * 100;
   document.getElementById('drift-rate').textContent = `${drift > 0 ? '+' : ''}${drift.toFixed(3)}%`;
 
-  // Draw Analog Clock
+  // Draw Clock
   drawAnalogClock(customHours, customMins, customSecs);
 
   requestAnimationFrame(updateApp);
@@ -98,7 +99,7 @@ function renderCalendarGrid(currentDay) {
   }
 }
 
-// Analog Clock Canvas Renderer
+// Analog Clock Canvas Renderer (20 Hours Dial)
 function drawAnalogClock(h, m, s) {
   const canvas = document.getElementById('clock-canvas');
   const ctx = canvas.getContext('2d');
@@ -108,7 +109,7 @@ function drawAnalogClock(h, m, s) {
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Clock Face
+  // Face
   ctx.beginPath();
   ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
   ctx.fillStyle = '#0f172a';
@@ -117,7 +118,7 @@ function drawAnalogClock(h, m, s) {
   ctx.lineWidth = 3;
   ctx.stroke();
 
-  // Draw 20 Hour Ticks
+  // 20 Hour Ticks
   for (let i = 0; i < HOURS_PER_DAY; i++) {
     const angle = (i / HOURS_PER_DAY) * 2 * Math.PI - Math.PI / 2;
     const tx1 = cx + Math.cos(angle) * (radius - 8);
@@ -133,7 +134,7 @@ function drawAnalogClock(h, m, s) {
     ctx.stroke();
   }
 
-  // Calculate Angles
+  // Hand Angles
   const sAngle = (s / SECS_PER_MIN) * 2 * Math.PI - Math.PI / 2;
   const mAngle = ((m + s / SECS_PER_MIN) / MINS_PER_HOUR) * 2 * Math.PI - Math.PI / 2;
   const hAngle = ((h + m / MINS_PER_HOUR) / HOURS_PER_DAY) * 2 * Math.PI - Math.PI / 2;
@@ -153,5 +154,5 @@ function drawHand(ctx, cx, cy, angle, length, color, width) {
   ctx.stroke();
 }
 
-// Start App Loop
+// Start Main Loop
 updateApp();
