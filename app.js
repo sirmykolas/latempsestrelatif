@@ -1,5 +1,5 @@
 // --- System Constants ---
-const EPOCH_START_UTC = Date.UTC(2026, 0, 1, 0, 0, 0); // Jan 1, 2026
+const EPOCH_START_UTC = Date.UTC(2026, 0, 1, 0, 0, 0); // Jan 1, 2026 00:00:00 UTC
 const PERIHELION_DAY_OF_YEAR = 3;
 
 const HOURS_PER_DAY = 20;
@@ -15,7 +15,7 @@ const ROMAN_HOURS = [
   "XVI", "XVII", "XVIII", "XIX"
 ];
 
-// Feature 1: Lunar Phases across 30-day Month
+// Lunar Phases across 30-day Month
 const LUNAR_PHASES = [
   "🌑 New Moon", "🌒 Waxing Crescent", "🌓 First Quarter", 
   "🌔 Waxing Gibbous", "🌕 Full Moon", "🌖 Waning Gibbous", 
@@ -45,9 +45,7 @@ function getDynamicParameters(now) {
   return { nuDeg, e, c, x_len, y0 };
 }
 
-// Feature 2: Solstice / Equinox Helper
 function getNextAstronomicalEvent(nuDeg) {
-  // Key orbital reference points in degrees
   const events = [
     { name: "Vernal Equinox", deg: 78.0 },
     { name: "Summer Solstice", deg: 168.0 },
@@ -73,7 +71,6 @@ function updateApp() {
   let timeLabelText = "";
 
   try {
-    // Detect local time offset
     const tzOffsetMs = now.getTimezoneOffset() * 60 * 1000;
     const localNow = new Date(now.getTime() - tzOffsetMs);
     const startOfLocalToday = Date.UTC(
@@ -87,7 +84,6 @@ function updateApp() {
     const localTimeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     timeLabelText = `${localTimeString} (${userTz})`;
   } catch (e) {
-    // Fallback to UTC if timezone info is unavailable or blocked
     const startOfUTCToday = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
     elapsedSISecondsToday = (now.getTime() - startOfUTCToday) / 1000;
     timeLabelText = now.toUTCString().split(' ')[4] + " UTC";
@@ -134,13 +130,13 @@ function updateApp() {
   const drift = ((params.x_len - params.y0) / params.y0) * 100;
   document.getElementById('drift-rate').textContent = `${drift > 0 ? '+' : ''}${drift.toFixed(3)}%`;
 
-  // Render Feature 1: Lunar Phase
+  // Lunar Phase
   const lunarIndex = Math.floor(((day - 1) / 30) * LUNAR_PHASES.length);
   if (document.getElementById('lunar-phase-text')) {
     document.getElementById('lunar-phase-text').textContent = LUNAR_PHASES[lunarIndex];
   }
 
-  // Render Feature 2: Solstice / Equinox Event
+  // Solstice / Equinox Event
   const astroEvent = getNextAstronomicalEvent(params.nuDeg);
   if (document.getElementById('astro-event-text')) {
     document.getElementById('astro-event-text').textContent = 
@@ -247,7 +243,7 @@ function drawHand(ctx, cx, cy, angle, length, color, width) {
   ctx.stroke();
 }
 
-// Feature 3: Register Service Worker for Offline / PWA operation
+// Service Worker Registration for PWA / Offline usage
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
