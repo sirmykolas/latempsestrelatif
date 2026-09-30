@@ -1,111 +1,158 @@
 :root {
   --bg-color: #0b0f19;
-  --card-bg: #161f30;
-  --accent: #4f46e5;
-  --accent-light: #818cf8;
-  --text: #f3f4f6;
-  --text-dim: #9ca3af;
-  --border: #2d3748;
+  --card-bg: #151c2e;
+  --accent-color: #818cf8;
+  --text-main: #f3f4f6;
+  --text-muted: #9ca3af;
+  --active-day: #6366f1;
+  --green-accent: #10b981;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
 
 body {
   background-color: var(--bg-color);
-  color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  min-height: 100vh;
-  padding: 20px;
+  color: var(--text-main);
+  padding: 20px 12px;
+  display: flex;
+  justify-content: center;
 }
 
 .container {
-  max-width: 1100px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 header {
   text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 8px;
 }
 
-h1 { font-size: 2rem; color: var(--text); }
-.subtitle { color: var(--accent-light); margin-top: 5px; }
+header h1 {
+  font-size: 1.25rem;
+  color: var(--accent-color);
+  letter-spacing: 0.5px;
+}
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 20px;
+.subtitle {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 4px;
 }
 
 .card {
-  background: var(--card-bg);
-  border: 1px solid var(--border);
+  background-color: var(--card-bg);
   border-radius: 12px;
-  padding: 20px;
+  padding: 16px;
+  border: 1px solid #1e293b;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+}
+
+.card h2 {
+  font-size: 1rem;
+  color: var(--accent-color);
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+/* Custom Calendar Layout */
+.calendar-header {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 16px;
+  background-color: #0f172a;
+  padding: 8px;
+  border-radius: 8px;
+}
+
+.cal-unit {
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
-h2 { font-size: 1.2rem; margin-bottom: 15px; color: var(--accent-light); }
-h3 { font-size: 1rem; margin: 10px 0; color: var(--text-dim); }
-
-/* Calendar Styling */
-.calendar-header {
-  display: flex;
-  gap: 15px;
-  margin-bottom: 15px;
-  width: 100%;
+.cal-label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  letter-spacing: 1px;
 }
 
-.stat-box {
-  flex: 1;
-  background: rgba(0,0,0,0.2);
-  padding: 10px;
-  border-radius: 8px;
-  text-align: center;
+.cal-value {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--accent-color);
 }
-
-.stat-box .label { display: block; font-size: 0.75rem; color: var(--text-dim); }
-.stat-box .val { font-size: 1.4rem; font-weight: bold; color: var(--accent-light); }
 
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
   gap: 6px;
-  width: 100%;
 }
 
 .day-cell {
-  background: #1e293b;
-  border-radius: 6px;
-  padding: 10px 0;
+  background-color: #0f172a;
+  padding: 8px 0;
   text-align: center;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
+  border-radius: 6px;
+  color: var(--text-muted);
 }
 
 .day-cell.active {
-  background: var(--accent);
+  background-color: var(--active-day);
+  color: #ffffff;
   font-weight: bold;
-  color: #fff;
-  box-shadow: 0 0 10px rgba(79, 70, 229, 0.5);
+  box-shadow: 0 0 8px rgba(99, 102, 241, 0.6);
 }
 
 /* Clock Display */
-.digital-time {
-  font-family: monospace;
-  font-size: 2rem;
-  margin-top: 15px;
-  color: #10b981;
+.clock-container {
+  display: flex;
+  justify-content: center;
+  margin: 8px 0;
 }
 
-/* Metrics */
-.metrics-card { align-items: stretch; }
-.metric {
+#clock-canvas {
+  width: 300px;
+  height: 300px;
+}
+
+.digital-time {
+  text-align: center;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--green-accent);
+  font-family: monospace;
+  letter-spacing: 2px;
+  margin-top: 8px;
+}
+
+/* Metric Rows */
+.metric-row {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 10px;
-  font-size: 0.95rem;
+  font-size: 0.85rem;
+  margin-bottom: 8px;
+  color: var(--text-muted);
 }
 
-hr { border: 0; border-top: 1px solid var(--border); margin: 15px 0; }
+.metric-value {
+  color: var(--text-main);
+  font-weight: 600;
+  font-family: monospace;
+}
+
+.divider {
+  border: 0;
+  height: 1px;
+  background: #1e293b;
+  margin: 12px 0;
+}
