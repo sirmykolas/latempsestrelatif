@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Le Temps Etoile Relatif</title>
+  <title>Le Temps Étoile - Multi-Planetary Horizon Engine</title>
   <link rel="stylesheet" href="style.css">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0f172a">
@@ -12,8 +12,18 @@
   <div class="container">
     <header>
       <h1>360-Day Astronomical Era</h1>
-      <p class="subtitle">Relativistic Celestial Coordinate Engine</p>
+      <p class="subtitle">Relativistic Multi-Planetary Coordinate Engine</p>
     </header>
+
+    <!-- Planetary Selector Card -->
+    <div class="card">
+      <h2>Orbital Body System</h2>
+      <div class="btn-group" id="planet-selector">
+        <button class="btn planet-btn active" data-planet="earth">🌍 Earth</button>
+        <button class="btn planet-btn" data-planet="mars">♂️ Mars</button>
+        <button class="btn planet-btn" data-planet="venus">♀️️ Venus</button>
+      </div>
+    </div>
 
     <!-- Custom Calendar Card -->
     <div class="card">
@@ -44,7 +54,29 @@
       <div id="custom-time-display" class="digital-time">00° 00' 00'' 00'''</div>
     </div>
 
-    <!-- Time-Travel & Simulation Controls -->
+    <!-- Geolocational Horizon Tracking Card -->
+    <div class="card">
+      <h2>Geolocational Horizon Tracking</h2>
+      <div class="metric-row">
+        <span>Observer Position:</span>
+        <span id="geo-coords-text" class="metric-value">Acquiring GPS...</span>
+      </div>
+      <div class="metric-row">
+        <span>Solar Elevation Angle:</span>
+        <span id="geo-elevation-text" class="metric-value">0.00°</span>
+      </div>
+      <div class="metric-row">
+        <span>Solar Azimuth Angle:</span>
+        <span id="geo-azimuth-text" class="metric-value">0.00°</span>
+      </div>
+      <div class="metric-row">
+        <span>Computed Horizon State:</span>
+        <span id="geo-state-text" class="metric-value">Calculating...</span>
+      </div>
+      <button id="request-gps-btn" class="btn" style="width: 100%; margin-top: 8px;">Use Exact GPS Location</button>
+    </div>
+
+    <!-- Simulation & Offset Controls -->
     <div class="card">
       <h2>Simulation & Offset Control</h2>
       <div class="control-group">
@@ -52,7 +84,7 @@
         <input type="range" id="time-scrubber" min="-180" max="180" value="0" step="1">
         <div class="control-readout">
           <span>Offset: <strong id="offset-days-display">0</strong> Days</span>
-          <button id="reset-time-btn" class="btn">Reset to Live Solar Coordinates</button>
+          <button id="reset-time-btn" class="btn">Reset Coordinates</button>
         </div>
       </div>
       <div class="control-group" style="margin-top: 12px;">
@@ -63,23 +95,6 @@
           <button class="btn speed-btn" data-speed="100">100x</button>
           <button class="btn speed-btn" data-speed="1000">1000x</button>
         </div>
-      </div>
-    </div>
-
-    <!-- Astronomical Cycles Card -->
-    <div class="card">
-      <h2>Astronomical Cycles</h2>
-      <div class="metric-row">
-        <span>Lunar Phase (30-day cycle):</span>
-        <span id="lunar-phase-text" class="metric-value">🌑 New Moon</span>
-      </div>
-      <div class="metric-row">
-        <span>Seasonal Alignment:</span>
-        <span id="astro-event-text" class="metric-value">Calculating...</span>
-      </div>
-      <div class="metric-row">
-        <span>Solar Horizon Arc:</span>
-        <span id="solar-phase-text" class="metric-value">0° Nadir Arc</span>
       </div>
     </div>
 
@@ -99,15 +114,12 @@
         <span id="m-e" class="metric-value">0.016709</span>
       </div>
       <div class="metric-row">
-        <span>Modulation Factor (c):</span>
-        <span id="m-c" class="metric-value">0.015330</span>
+        <span>Obliquity (ε):</span>
+        <span id="m-obliquity" class="metric-value">23.44°</span>
       </div>
       <hr class="divider">
       <div class="metric-row">
-        <span>Atomic Comparison:</span>
-      </div>
-      <div class="metric-row">
-        <span>Local Horizon Reference:</span>
+        <span>Atomic Comparison (Earth UTC):</span>
         <span id="utc-time" class="metric-value">00:00:00 UTC</span>
       </div>
       <div class="metric-row">
@@ -117,6 +129,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=7.0"></script>
+  <script src="app.js?v=8.0"></script>
 </body>
 </html>
