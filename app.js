@@ -1,6 +1,6 @@
 /**
  * Le Temps Céleste Relatif
- * Direct Solar Longitude Arc Rendering (360° celestial coordinate)
+ * Solar Longitude Arc Rendering Engine
  */
 
 const RAD = Math.PI / 180;
@@ -57,7 +57,6 @@ function getAbsoluteSolarCoordinates(date) {
   };
 }
 
-// Convert Solar Longitude to Arc Degrees, Minutes, Seconds
 function getArcTime(longitude) {
   const deg = Math.floor(longitude);
   const minFull = (longitude - deg) * 60;
@@ -69,7 +68,7 @@ function getArcTime(longitude) {
 
 document.addEventListener('DOMContentLoaded', () => {
   const canvas = document.getElementById('clockCanvas');
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas ? canvas.getContext('2d') : null;
 
   const elDigitalTime = document.getElementById('digitalTime');
   const elSunLong     = document.getElementById('sunLong');
@@ -85,15 +84,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const arc = getArcTime(solar.apparentLongitude);
 
     const fmt = (n) => n.toString().padStart(2, '0');
-    elDigitalTime.textContent = `${fmt(arc.deg)}° ${fmt(arc.min)}′ ${fmt(arc.sec)}″`;
+    if (elDigitalTime) elDigitalTime.textContent = `${fmt(arc.deg)}° ${fmt(arc.min)}′ ${fmt(arc.sec)}″`;
 
-    elSunLong.textContent = `${solar.apparentLongitude.toFixed(4)}°`;
-    elVsopCorr.textContent = `${(solar.vsopPerturbation * 3600).toFixed(2)}″`;
-    elPrecNutCorr.textContent = `${(solar.precNutCorrection * 3600).toFixed(2)}″`;
-    elDeltaTVal.textContent = `${solar.deltaT.toFixed(2)} s`;
-    elStepScale.textContent = `${solar.instantaneousVelocityScale.toFixed(6)}x`;
+    if (elSunLong)     elSunLong.textContent = `${solar.apparentLongitude.toFixed(4)}°`;
+    if (elVsopCorr)    elVsopCorr.textContent = `${(solar.vsopPerturbation * 3600).toFixed(2)}″`;
+    if (elPrecNutCorr) elPrecNutCorr.textContent = `${(solar.precNutCorrection * 3600).toFixed(2)}″`;
+    if (elDeltaTVal)   elDeltaTVal.textContent = `${solar.deltaT.toFixed(2)} s`;
+    if (elStepScale)   elStepScale.textContent = `${solar.instantaneousVelocityScale.toFixed(6)}x`;
 
-    drawClock(ctx, canvas.width, canvas.height, solar.apparentLongitude);
+    if (ctx && canvas) {
+      drawClock(ctx, canvas.width, canvas.height, solar.apparentLongitude);
+    }
   }
 
   function drawClock(ctx, width, height, longitude) {
@@ -138,13 +139,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const themes = ['dark', 'daylight', 'twilight'];
   let currentThemeIdx = 0;
 
-  btnTheme.addEventListener('click', () => {
-    currentThemeIdx = (currentThemeIdx + 1) % themes.length;
-    document.documentElement.setAttribute('data-theme', themes[currentThemeIdx]);
-    update();
-  });
+  if (btnTheme) {
+    btnTheme.addEventListener('click', () => {
+      currentThemeIdx = (currentThemeIdx + 1) % themes.length;
+      document.documentElement.setAttribute('data-theme', themes[currentThemeIdx]);
+      update();
+    });
+  }
 
-  // Safe Start
+  // Safe Start Loop
   update();
   setInterval(update, 1000);
 });
