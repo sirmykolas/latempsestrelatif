@@ -2,12 +2,13 @@
 const EPOCH_START_UTC = Date.UTC(2026, 0, 1, 0, 0, 0); // Jan 1, 2026
 const PERIHELION_DAY_OF_YEAR = 3;
 
-const HOURS_PER_DAY = 20;
-const MINS_PER_HOUR = 72;
-const SECS_PER_MIN = 72;
-const TOTAL_CUSTOM_SECS_PER_DAY = HOURS_PER_DAY * MINS_PER_HOUR * SECS_PER_MIN; // 103,680 custom secs/day
+const ARCS_PER_DAY = 20;       // 20 primary arcs (°)
+const PRIMES_PER_ARC = 72;     // 72 prime units (')
+const BEATS_PER_PRIME = 72;    // 72 beats ('')
+const TOTAL_CUSTOM_SECS_PER_DAY = ARCS_PER_DAY * PRIMES_PER_ARC * BEATS_PER_PRIME; // 103,680 units/day
 
-const ROMAN_HOURS = [
+// Roman numerals for 20 primary solar arcs (0 / 20 at top is XX)
+const ROMAN_ARCS = [
   "XX", "I", "II", "III", "IV", "V", 
   "VI", "VII", "VIII", "IX", "X", 
   "XI", "XII", "XIII", "XIV", "XV", 
@@ -26,9 +27,9 @@ let speedMultiplier = 1;
 let lastRealTime = performance.now();
 let virtualTimeMs = Date.now();
 
-// --- Newton-Raphson Kepler Equation Solver ---
+// --- Newton-Raphson Kepler Solver ---
 function solveKepler(M, e) {
-  let E = M; // Initial guess
+  let E = M;
   const tolerance = 1e-8;
   const maxIterations = 100;
 
@@ -45,17 +46,14 @@ function getDynamicParameters(now) {
   const startOfYear = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
   const dayOfYear = (now - startOfYear) / 86400000;
   
-  // Mean Anomaly (M)
   const M_rad = ((dayOfYear - PERIHELION_DAY_OF_YEAR) / 365.25) * 2 * Math.PI;
 
   const e_0 = 0.0167086;
   const t_years = (now.getTime() - EPOCH_START_UTC) / (365.25 * 86400000 * 1000);
   const e = e_0 + 0.00005 * Math.cos(2 * Math.PI * t_years / 11.86);
 
-  // Solves Kepler's Equation for exact Eccentric Anomaly (E)
   const E_rad = solveKepler(M_rad, e);
 
-  // Computes exact True Anomaly (nu) from Eccentric Anomaly
   const tanHalfNu = Math.sqrt((1 + e) / (1 - e)) * Math.tan(E_rad / 2);
   let nuRad = 2 * Math.atan(tanHalfNu);
   if (nuRad < 0) nuRad += 2 * Math.PI;
@@ -99,7 +97,6 @@ function updateApp() {
   const deltaRealMs = currentPerformanceTime - lastRealTime;
   lastRealTime = currentPerformanceTime;
 
-  // Apply speed multiplier to time tracking
   if (speedMultiplier === 1 && simOffsetMs === 0) {
     virtualTimeMs = Date.now();
   } else {
@@ -132,23 +129,23 @@ function updateApp() {
     timeLabelText = now.toUTCString().split(' ')[4] + " UTC";
   }
 
-  // Custom Time Math
+  // Pure Solar Coordinate Math
   const customSecRatio = TOTAL_CUSTOM_SECS_PER_DAY / 86400;
-  const secondsToday = (elapsedSISecondsToday * customSecRatio) / (params.x_len / params.y0);
+  const unitsToday = (elapsedSISecondsToday * customSecRatio) / (params.x_len / params.y0);
 
   // Calendar Math
   const elapsedSISecondsEpoch = (now.getTime() - EPOCH_START_UTC) / 1000;
-  const totalCustomSeconds = elapsedSISecondsEpoch / params.x_len;
-  const totalDays = Math.floor(totalCustomSeconds / TOTAL_CUSTOM_SECS_PER_DAY);
+  const totalCustomUnits = elapsedSISecondsEpoch / params.x_len;
+  const totalDays = Math.floor(totalCustomUnits / TOTAL_CUSTOM_SECS_PER_DAY);
   const year = Math.floor(totalDays / 360) + 1;
   const dayOfYear360 = ((totalDays % 360) + 360) % 360;
   const month = Math.floor(dayOfYear360 / 30) + 1;
   const day = (dayOfYear360 % 30) + 1;
 
-  // Breakdown
-  const customHours = Math.floor(secondsToday / (MINS_PER_HOUR * SECS_PER_MIN));
-  const customMins = Math.floor((secondsToday % (MINS_PER_HOUR * SECS_PER_MIN)) / SECS_PER_MIN);
-  const customSecs = Math.floor(secondsToday % SECS_PER_MIN);
+  // Breakdown into Geometric Notation (° ' '')
+  const primaryArc = Math.floor(unitsToday / (PRIMES_PER_ARC * BEATS_PER_PRIME));
+  const primeUnit = Math.floor((unitsToday % (PRIMES_PER_ARC * BEATS_PER_PRIME)) / BEATS_PER_PRIME);
+  const beatUnit = Math.floor(unitsToday % BEATS_PER_PRIME);
 
   // --- RENDER UI ---
   safeSetText('cal-year', year);
@@ -156,7 +153,11 @@ function updateApp() {
   safeSetText('cal-day', String(day).padStart(2, '0'));
   renderCalendarGrid(day);
 
-  safeSetText('custom-time-display', `${String(customHours).padStart(2, '0')}:${String(customMins).padStart(2, '0')}:${String(customSecs).padStart(2, '0')}`);
+  // Pure Celestial Notation Display (° ' '')
+  safeSetText(
+    'custom-time-display', 
+    `${String(primaryArc).padStart(2, '0')}° ${String(primeUnit).padStart(2, '0')}' ${String(beatUnit).padStart(2, '0')}''`
+  );
 
   safeSetText('m-nu', `${params.nuDeg.toFixed(2)}°`);
   safeSetText('m-xlen', `${params.x_len.toFixed(5)} s`);
@@ -176,20 +177,20 @@ function updateApp() {
   const astroEvent = getNextAstronomicalEvent(params.nuDeg);
   safeSetText('astro-event-text', `Next: ${astroEvent.event} (${astroEvent.remainingDeg.toFixed(1)}° away)`);
 
-  // Dynamic Solar Horizon / UI Twilight Phase
-  const hourFraction = customHours / HOURS_PER_DAY;
-  if (hourFraction >= 0.25 && hourFraction <= 0.75) {
+  // Solar Horizon Phase
+  const arcFraction = primaryArc / ARCS_PER_DAY;
+  if (arcFraction >= 0.25 && arcFraction <= 0.75) {
     document.body.setAttribute('data-theme', 'daylight');
-    safeSetText('solar-phase-text', '☀️ Solar Zenith');
-  } else if ((hourFraction > 0.20 && hourFraction < 0.25) || (hourFraction > 0.75 && hourFraction < 0.80)) {
+    safeSetText('solar-phase-text', '☀️ Solar Zenith Arc');
+  } else if ((arcFraction > 0.20 && arcFraction < 0.25) || (arcFraction > 0.75 && arcFraction < 0.80)) {
     document.body.setAttribute('data-theme', 'twilight');
-    safeSetText('solar-phase-text', '🌅 Solar Twilight');
+    safeSetText('solar-phase-text', '🌅 Twilight Arc Shift');
   } else {
     document.body.removeAttribute('data-theme');
-    safeSetText('solar-phase-text', '🌌 Deep Cosmic Night');
+    safeSetText('solar-phase-text', '🌌 Deep Nadir Arc');
   }
 
-  drawAnalogClock(customHours, customMins, customSecs);
+  drawAnalogClock(primaryArc, primeUnit, beatUnit);
 
   requestAnimationFrame(updateApp);
 }
@@ -210,7 +211,7 @@ function renderCalendarGrid(currentDay) {
   }
 }
 
-function drawAnalogClock(h, m, s) {
+function drawAnalogClock(arc, prime, beat) {
   const canvas = document.getElementById('clock-canvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
@@ -229,9 +230,9 @@ function drawAnalogClock(h, m, s) {
   ctx.lineWidth = 3;
   ctx.stroke();
 
-  // 72 Graduation Ticks
-  for (let i = 0; i < SECS_PER_MIN; i++) {
-    const angle = (i / SECS_PER_MIN) * 2 * Math.PI - Math.PI / 2;
+  // 72 Graduation Ticks (')
+  for (let i = 0; i < PRIMES_PER_ARC; i++) {
+    const angle = (i / PRIMES_PER_ARC) * 2 * Math.PI - Math.PI / 2;
     const isMajor = (i % 3.6) < 1;
     const tickLen = isMajor ? 5 : 3;
 
@@ -243,14 +244,14 @@ function drawAnalogClock(h, m, s) {
     ctx.stroke();
   }
 
-  // 20 Roman Hour Marks
+  // 20 Primary Celestial Arc Marks (°)
   ctx.font = '600 10px serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = '#c7d2fe';
 
-  for (let i = 0; i < HOURS_PER_DAY; i++) {
-    const angle = (i / HOURS_PER_DAY) * 2 * Math.PI - Math.PI / 2;
+  for (let i = 0; i < ARCS_PER_DAY; i++) {
+    const angle = (i / ARCS_PER_DAY) * 2 * Math.PI - Math.PI / 2;
 
     ctx.beginPath();
     ctx.moveTo(cx + Math.cos(angle) * (radius - 10), cy + Math.sin(angle) * (radius - 10));
@@ -262,16 +263,16 @@ function drawAnalogClock(h, m, s) {
     const numRadius = radius - 20;
     const nx = cx + Math.cos(angle) * numRadius;
     const ny = cy + Math.sin(angle) * numRadius;
-    ctx.fillText(ROMAN_HOURS[i], nx, ny);
+    ctx.fillText(ROMAN_ARCS[i], nx, ny);
   }
 
-  const sAngle = (s / SECS_PER_MIN) * 2 * Math.PI - Math.PI / 2;
-  const mAngle = ((m + s / SECS_PER_MIN) / MINS_PER_HOUR) * 2 * Math.PI - Math.PI / 2;
-  const hAngle = ((h + m / MINS_PER_HOUR) / HOURS_PER_DAY) * 2 * Math.PI - Math.PI / 2;
+  const beatAngle = (beat / BEATS_PER_PRIME) * 2 * Math.PI - Math.PI / 2;
+  const primeAngle = ((prime + beat / BEATS_PER_PRIME) / PRIMES_PER_ARC) * 2 * Math.PI - Math.PI / 2;
+  const arcAngle = ((arc + prime / PRIMES_PER_ARC) / ARCS_PER_DAY) * 2 * Math.PI - Math.PI / 2;
 
-  drawHand(ctx, cx, cy, hAngle, radius * 0.45, '#f3f4f6', 4);
-  drawHand(ctx, cx, cy, mAngle, radius * 0.65, '#818cf8', 2.5);
-  drawHand(ctx, cx, cy, sAngle, radius * 0.82, '#10b981', 1.5);
+  drawHand(ctx, cx, cy, arcAngle, radius * 0.45, '#f3f4f6', 4);
+  drawHand(ctx, cx, cy, primeAngle, radius * 0.65, '#818cf8', 2.5);
+  drawHand(ctx, cx, cy, beatAngle, radius * 0.82, '#10b981', 1.5);
 
   ctx.beginPath();
   ctx.arc(cx, cy, 4, 0, 2 * Math.PI);
@@ -288,7 +289,7 @@ function drawHand(ctx, cx, cy, angle, length, color, width) {
   ctx.stroke();
 }
 
-// --- EVENT LISTENERS FOR TIME TRAVEL & SPEED CONTROLS ---
+// --- EVENT LISTENERS ---
 document.addEventListener('DOMContentLoaded', () => {
   const scrubber = document.getElementById('time-scrubber');
   const offsetDisplay = document.getElementById('offset-days-display');
