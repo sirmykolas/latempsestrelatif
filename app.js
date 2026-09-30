@@ -1,6 +1,6 @@
 // --- System Constants ---
-const EPOCH_START_UTC = Date.UTC(2026, 0, 1, 0, 0, 0); // Epoch: Jan 1, 2026 00:00:00 UTC
-const PERIHELION_DAY_OF_YEAR = 3; // Jan 3
+const EPOCH_START_UTC = Date.UTC(2026, 0, 1, 0, 0, 0); // Epoch: Jan 1, 2026
+const PERIHELION_DAY_OF_YEAR = 3;
 
 const HOURS_PER_DAY = 20;
 const MINS_PER_HOUR = 72;
@@ -11,21 +11,21 @@ function getDynamicParameters(now) {
   const startOfYear = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
   const dayOfYear = (now - startOfYear) / 86400000;
   
-  // True Anomaly ν
   const nuRad = ((dayOfYear - PERIHELION_DAY_OF_YEAR) / 365.25) * 2 * Math.PI;
   const nuDeg = ((nuRad * 180 / Math.PI) + 360) % 360;
 
-  // Perturbative Eccentricity e(t)
   const e_0 = 0.0167086;
   const t_years = (now.getTime() - EPOCH_START_UTC) / (365.25 * 86400000 * 1000);
   const e = e_0 + 0.00005 * Math.cos(2 * Math.PI * t_years / 11.86);
 
-  // Axial Obliquity ε = 23.44°
   const obliquityRad = 23.44 * (Math.PI / 180);
   const c = e * Math.cos(obliquityRad);
 
-  // Kimtys-Judeikis Formula: x(ν, t)
-  const y0 = 86400 / TOTAL_CUSTOM_SECS_PER_DAY; // Baseline scaling (0.83333... SI sec per custom sec)
+  // Scaled y0: Maps 360 custom days exactly across 365.25 tropical SI days
+  const SI_SECONDS_PER_360_YEAR = 365.25 * 86400;
+  const TOTAL_CUSTOM_SECS_PER_YEAR = 360 * TOTAL_CUSTOM_SECS_PER_DAY;
+  const y0 = SI_SECONDS_PER_360_YEAR / TOTAL_CUSTOM_SECS_PER_YEAR; 
+
   const x_len = y0 * (1 + c * Math.cos(nuRad)) / Math.pow(1 + e * Math.cos(nuRad), 2);
 
   return { nuDeg, e, c, x_len, y0 };
@@ -38,25 +38,19 @@ function updateApp() {
 
   const params = getDynamicParameters(now);
 
-  // Total custom seconds passed since Epoch
   const totalCustomSeconds = elapsedSISeconds / params.x_len;
-
-  // Synchronized daily cycle (0 to 103,679)
   const secondsToday = ((totalCustomSeconds % TOTAL_CUSTOM_SECS_PER_DAY) + TOTAL_CUSTOM_SECS_PER_DAY) % TOTAL_CUSTOM_SECS_PER_DAY;
 
-  // Calendar Math (360 days per year: 12 months * 30 days)
   const totalDays = Math.floor(totalCustomSeconds / TOTAL_CUSTOM_SECS_PER_DAY);
   const year = Math.floor(totalDays / 360) + 1;
   const dayOfYear360 = ((totalDays % 360) + 360) % 360;
   const month = Math.floor(dayOfYear360 / 30) + 1;
   const day = (dayOfYear360 % 30) + 1;
 
-  // 20h / 72m / 72s Breakdown
   const customHours = Math.floor(secondsToday / (MINS_PER_HOUR * SECS_PER_MIN));
   const customMins = Math.floor((secondsToday % (MINS_PER_HOUR * SECS_PER_MIN)) / SECS_PER_MIN);
   const customSecs = Math.floor(secondsToday % SECS_PER_MIN);
 
-  // Render UI
   if (document.getElementById('cal-year')) {
     document.getElementById('cal-year').textContent = year;
     document.getElementById('cal-month').textContent = String(month).padStart(2, '0');
@@ -67,7 +61,6 @@ function updateApp() {
   document.getElementById('custom-time-display').textContent = 
     `${String(customHours).padStart(2, '0')}:${String(customMins).padStart(2, '0')}:${String(customSecs).padStart(2, '0')}`;
 
-  // Metrics
   document.getElementById('m-nu').textContent = `${params.nuDeg.toFixed(2)}°`;
   document.getElementById('m-xlen').textContent = `${params.x_len.toFixed(5)} s`;
   document.getElementById('m-e').textContent = params.e.toFixed(6);
@@ -77,13 +70,11 @@ function updateApp() {
   const drift = ((params.x_len - params.y0) / params.y0) * 100;
   document.getElementById('drift-rate').textContent = `${drift > 0 ? '+' : ''}${drift.toFixed(3)}%`;
 
-  // Draw Clock
   drawAnalogClock(customHours, customMins, customSecs);
 
   requestAnimationFrame(updateApp);
 }
 
-// Render Month Grid
 let lastActiveDay = -1;
 function renderCalendarGrid(currentDay) {
   if (lastActiveDay === currentDay) return;
@@ -99,7 +90,6 @@ function renderCalendarGrid(currentDay) {
   }
 }
 
-// Analog Clock Canvas Renderer (20 Hours Dial)
 function drawAnalogClock(h, m, s) {
   const canvas = document.getElementById('clock-canvas');
   const ctx = canvas.getContext('2d');
@@ -109,7 +99,6 @@ function drawAnalogClock(h, m, s) {
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Face
   ctx.beginPath();
   ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
   ctx.fillStyle = '#0f172a';
@@ -118,7 +107,6 @@ function drawAnalogClock(h, m, s) {
   ctx.lineWidth = 3;
   ctx.stroke();
 
-  // 20 Hour Ticks
   for (let i = 0; i < HOURS_PER_DAY; i++) {
     const angle = (i / HOURS_PER_DAY) * 2 * Math.PI - Math.PI / 2;
     const tx1 = cx + Math.cos(angle) * (radius - 8);
@@ -134,15 +122,13 @@ function drawAnalogClock(h, m, s) {
     ctx.stroke();
   }
 
-  // Hand Angles
   const sAngle = (s / SECS_PER_MIN) * 2 * Math.PI - Math.PI / 2;
   const mAngle = ((m + s / SECS_PER_MIN) / MINS_PER_HOUR) * 2 * Math.PI - Math.PI / 2;
   const hAngle = ((h + m / MINS_PER_HOUR) / HOURS_PER_DAY) * 2 * Math.PI - Math.PI / 2;
 
-  // Draw Hands
-  drawHand(ctx, cx, cy, hAngle, radius * 0.5, '#f3f4f6', 5); // Hour Hand
-  drawHand(ctx, cx, cy, mAngle, radius * 0.7, '#818cf8', 3); // Minute Hand
-  drawHand(ctx, cx, cy, sAngle, radius * 0.85, '#10b981', 1.5); // Second Hand
+  drawHand(ctx, cx, cy, hAngle, radius * 0.5, '#f3f4f6', 5);
+  drawHand(ctx, cx, cy, mAngle, radius * 0.7, '#818cf8', 3);
+  drawHand(ctx, cx, cy, sAngle, radius * 0.85, '#10b981', 1.5);
 }
 
 function drawHand(ctx, cx, cy, angle, length, color, width) {
@@ -154,5 +140,4 @@ function drawHand(ctx, cx, cy, angle, length, color, width) {
   ctx.stroke();
 }
 
-// Start Main Loop
 updateApp();
