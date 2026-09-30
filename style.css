@@ -1,0 +1,111 @@
+:root {
+  --bg-color: #0b0f19;
+  --card-bg: #161f30;
+  --accent: #4f46e5;
+  --accent-light: #818cf8;
+  --text: #f3f4f6;
+  --text-dim: #9ca3af;
+  --border: #2d3748;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+h1 { font-size: 2rem; color: var(--text); }
+.subtitle { color: var(--accent-light); margin-top: 5px; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+h2 { font-size: 1.2rem; margin-bottom: 15px; color: var(--accent-light); }
+h3 { font-size: 1rem; margin: 10px 0; color: var(--text-dim); }
+
+/* Calendar Styling */
+.calendar-header {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 15px;
+  width: 100%;
+}
+
+.stat-box {
+  flex: 1;
+  background: rgba(0,0,0,0.2);
+  padding: 10px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.stat-box .label { display: block; font-size: 0.75rem; color: var(--text-dim); }
+.stat-box .val { font-size: 1.4rem; font-weight: bold; color: var(--accent-light); }
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+  width: 100%;
+}
+
+.day-cell {
+  background: #1e293b;
+  border-radius: 6px;
+  padding: 10px 0;
+  text-align: center;
+  font-size: 0.85rem;
+}
+
+.day-cell.active {
+  background: var(--accent);
+  font-weight: bold;
+  color: #fff;
+  box-shadow: 0 0 10px rgba(79, 70, 229, 0.5);
+}
+
+/* Clock Display */
+.digital-time {
+  font-family: monospace;
+  font-size: 2rem;
+  margin-top: 15px;
+  color: #10b981;
+}
+
+/* Metrics */
+.metrics-card { align-items: stretch; }
+.metric {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 0.95rem;
+}
+
+hr { border: 0; border-top: 1px solid var(--border); margin: 15px 0; }
