@@ -95,18 +95,13 @@ h2 {
   letter-spacing: 2px;
   text-transform: uppercase;
   margin-bottom: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
 }
 
-/* Clock Visualizer */
 .clock-container {
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 28px 20px;
-  position: relative;
 }
 
 canvas {
@@ -118,51 +113,10 @@ canvas {
   font-size: 1.4rem;
   font-weight: 400;
   color: var(--text-main);
-  letter-spacing: 3px;
+  letter-spacing: 2px;
   text-shadow: 0 0 10px var(--accent-glow);
 }
 
-/* Calendar Grid */
-.calendar-header {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.8rem;
-  letter-spacing: 1px;
-  color: var(--text-muted);
-  margin-bottom: 12px;
-}
-
-.calendar-header span strong {
-  color: var(--accent-gold);
-  font-weight: 500;
-}
-
-.calendar-grid {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 6px;
-  text-align: center;
-}
-
-.day-cell {
-  padding: 10px 0;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.03);
-  border-radius: 6px;
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  transition: all 0.2s ease;
-}
-
-.day-cell.active {
-  background: var(--accent-gold);
-  border-color: var(--accent-gold);
-  color: #090d16;
-  font-weight: 600;
-  box-shadow: 0 0 12px var(--accent-glow);
-}
-
-/* Metrics Table */
 .metric-row {
   display: flex;
   justify-content: space-between;
