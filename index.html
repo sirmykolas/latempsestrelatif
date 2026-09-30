@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kimtys-Judeikis Astronomical Time & Calendar System</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Kimtys-Judeikis Clock & Calendar</h1>
+      <p class="subtitle">360-Day Astronomical Era — Year 1</p>
+    </header>
+
+    <div class="grid">
+      <!-- Calendar View -->
+      <div class="card calendar-card">
+        <h2>Custom Calendar</h2>
+        <div class="calendar-header">
+          <div class="stat-box">
+            <span class="label">YEAR</span>
+            <span class="val" id="cal-year">1</span>
+          </div>
+          <div class="stat-box">
+            <span class="label">MONTH</span>
+            <span class="val" id="cal-month">01</span>
+          </div>
+          <div class="stat-box">
+            <span class="label">DAY</span>
+            <span class="val" id="cal-day">01</span>
+          </div>
+        </div>
+        <div class="calendar-grid" id="calendar-days"></div>
+      </div>
+
+      <!-- Analog Visual Clock -->
+      <div class="card clock-card">
+        <h2>Astronomical Dial</h2>
+        <canvas id="clock-canvas" width="280" height="280"></canvas>
+        <div class="digital-time" id="custom-time-display">00:00:00</div>
+      </div>
+
+      <!-- Live Formula Metrics -->
+      <div class="card metrics-card">
+        <h2>Dynamic Formula Metrics</h2>
+        <div class="metric">
+          <span>True Anomaly ($\nu$):</span>
+          <strong id="m-nu">0.00°</strong>
+        </div>
+        <div class="metric">
+          <span>Dynamic Second Length ($x$):</span>
+          <strong id="m-xlen">1.00000 s</strong>
+        </div>
+        <div class="metric">
+          <span>Eccentricity ($e$):</span>
+          <strong id="m-e">0.01671</strong>
+        </div>
+        <div class="metric">
+          <span>Modulation Factor ($c$):</span>
+          <strong id="m-c">0.01533</strong>
+        </div>
+        <hr>
+        <h3>Atomic Clock Comparison</h3>
+        <div class="metric">
+          <span>UTC Atomic Time:</span>
+          <strong id="utc-time">00:00:00 UTC</strong>
+        </div>
+        <div class="metric">
+          <span>Drift Rate vs SI Second:</span>
+          <strong id="drift-rate">0.00%</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
