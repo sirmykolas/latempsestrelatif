@@ -62,6 +62,11 @@ function getNextAstronomicalEvent(nuDeg) {
   return { event: "Vernal Equinox", remainingDeg: (360 - nuDeg) + 78.0 };
 }
 
+function safeSetText(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
+}
+
 function updateApp() {
   const now = new Date();
   const params = getDynamicParameters(now);
@@ -108,40 +113,30 @@ function updateApp() {
   const customSecs = Math.floor(secondsToday % SECS_PER_MIN);
 
   // --- RENDER UI ---
-  if (document.getElementById('cal-year')) {
-    document.getElementById('cal-year').textContent = year;
-    document.getElementById('cal-month').textContent = String(month).padStart(2, '0');
-    document.getElementById('cal-day').textContent = String(day).padStart(2, '0');
-    renderCalendarGrid(day);
-  }
+  safeSetText('cal-year', year);
+  safeSetText('cal-month', String(month).padStart(2, '0'));
+  safeSetText('cal-day', String(day).padStart(2, '0'));
+  renderCalendarGrid(day);
 
-  document.getElementById('custom-time-display').textContent = 
-    `${String(customHours).padStart(2, '0')}:${String(customMins).padStart(2, '0')}:${String(customSecs).padStart(2, '0')}`;
+  safeSetText('custom-time-display', `${String(customHours).padStart(2, '0')}:${String(customMins).padStart(2, '0')}:${String(customSecs).padStart(2, '0')}`);
 
-  document.getElementById('m-nu').textContent = `${params.nuDeg.toFixed(2)}°`;
-  document.getElementById('m-xlen').textContent = `${params.x_len.toFixed(5)} s`;
-  document.getElementById('m-e').textContent = params.e.toFixed(6);
-  document.getElementById('m-c').textContent = params.c.toFixed(6);
+  safeSetText('m-nu', `${params.nuDeg.toFixed(2)}°`);
+  safeSetText('m-xlen', `${params.x_len.toFixed(5)} s`);
+  safeSetText('m-e', params.e.toFixed(6));
+  safeSetText('m-c', params.c.toFixed(6));
 
-  if (document.getElementById('utc-time')) {
-    document.getElementById('utc-time').textContent = timeLabelText;
-  }
+  safeSetText('utc-time', timeLabelText);
 
   const drift = ((params.x_len - params.y0) / params.y0) * 100;
-  document.getElementById('drift-rate').textContent = `${drift > 0 ? '+' : ''}${drift.toFixed(3)}%`;
+  safeSetText('drift-rate', `${drift > 0 ? '+' : ''}${drift.toFixed(3)}%`);
 
-  // Lunar Phase
-  const lunarIndex = Math.floor(((day - 1) / 30) * LUNAR_PHASES.length);
-  if (document.getElementById('lunar-phase-text')) {
-    document.getElementById('lunar-phase-text').textContent = LUNAR_PHASES[lunarIndex];
-  }
+  // Render Lunar Phase
+  const lunarIndex = Math.min(Math.floor(((day - 1) / 30) * LUNAR_PHASES.length), LUNAR_PHASES.length - 1);
+  safeSetText('lunar-phase-text', LUNAR_PHASES[lunarIndex]);
 
-  // Solstice / Equinox Event
+  // Render Solstice / Equinox Event
   const astroEvent = getNextAstronomicalEvent(params.nuDeg);
-  if (document.getElementById('astro-event-text')) {
-    document.getElementById('astro-event-text').textContent = 
-      `Next: ${astroEvent.event} (${astroEvent.remainingDeg.toFixed(1)}° away)`;
-  }
+  safeSetText('astro-event-text', `Next: ${astroEvent.event} (${astroEvent.remainingDeg.toFixed(1)}° away)`);
 
   // Draw Clock Canvas
   drawAnalogClock(customHours, customMins, customSecs);
@@ -243,7 +238,6 @@ function drawHand(ctx, cx, cy, angle, length, color, width) {
   ctx.stroke();
 }
 
-// Service Worker Registration for PWA / Offline usage
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
