@@ -1,35 +1,12 @@
-// --- Planetary Body Configurations ---
-const PLANET_CONFIGS = {
-  earth: {
-    name: "Earth",
-    eccentricity: 0.0167086,
-    obliquityDeg: 23.44,
-    perihelionDay: 3,
-    orbitDays: 365.25,
-    solDurationSec: 86400,
-    epochStartUtc: Date.UTC(2026, 0, 1, 0, 0, 0)
-  },
-  mars: {
-    name: "Mars",
-    eccentricity: 0.0934000,
-    obliquityDeg: 25.19,
-    perihelionDay: 160,
-    orbitDays: 686.98,
-    solDurationSec: 88642.66, // 24h 39m 35.244s
-    epochStartUtc: Date.UTC(2026, 0, 1, 0, 0, 0)
-  },
-  venus: {
-    name: "Venus",
-    eccentricity: 0.0067720,
-    obliquityDeg: 177.36, // Retrograde rotation
-    perihelionDay: 50,
-    orbitDays: 224.70,
-    solDurationSec: 10087200, // Solar day ~116.75 Earth days
-    epochStartUtc: Date.UTC(2026, 0, 1, 0, 0, 0)
-  }
+// --- Earth Solar & Orbital Constants ---
+const EARTH = {
+  eccentricity: 0.0167086,
+  obliquityDeg: 23.44,
+  perihelionDay: 3,
+  orbitDays: 365.25,
+  solDurationSec: 86400,
+  epochStartUtc: Date.UTC(2026, 0, 1, 0, 0, 0)
 };
-
-let currentPlanetKey = "earth";
 
 // --- System Sub-unit Constants ---
 const PRIMARY_ARCS = 20;
@@ -46,13 +23,7 @@ const ROMAN_ARCS = [
   "XVI", "XVII", "XVIII", "XIX"
 ];
 
-// --- Simulation State ---
-let simOffsetMs = 0;
-let speedMultiplier = 1;
-let lastRealTime = performance.now();
-let virtualTimeMs = Date.now();
-
-// Default coordinates: Vilnius, Lithuania (54.6872° N, 25.2798° E)
+// Default Observer Coordinates: Vilnius, Lithuania (54.6872° N, 25.2798° E)
 let observerCoords = { lat: 54.6872, lon: 25.2798, source: "Default (Vilnius)" };
 
 // --- Keplerian Solver ---
@@ -67,12 +38,12 @@ function solveKepler(M, e) {
   return E;
 }
 
-function getDynamicParameters(now, planet) {
+function getDynamicParameters(now) {
   const startOfYear = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
   const dayOfYear = (now - startOfYear) / 86400000;
   
-  const M_rad = ((dayOfYear - planet.perihelionDay) / planet.orbitDays) * 2 * Math.PI;
-  const e = planet.eccentricity;
+  const M_rad = ((dayOfYear - EARTH.perihelionDay) / EARTH.orbitDays) * 2 * Math.PI;
+  const e = EARTH.eccentricity;
   const E_rad = solveKepler(M_rad, e);
 
   const tanHalfNu = Math.sqrt((1 + e) / (1 - e)) * Math.tan(E_rad / 2);
@@ -80,19 +51,19 @@ function getDynamicParameters(now, planet) {
   if (nuRad < 0) nuRad += 2 * Math.PI;
   const nuDeg = (nuRad * 180 / Math.PI) % 360;
 
-  const obliquityRad = planet.obliquityDeg * (Math.PI / 180);
+  const obliquityRad = EARTH.obliquityDeg * (Math.PI / 180);
   const c = e * Math.cos(obliquityRad);
 
-  const totalSiYear = planet.orbitDays * planet.solDurationSec;
+  const totalSiYear = EARTH.orbitDays * EARTH.solDurationSec;
   const totalCustomUnitsYear = 360 * BASE_UNITS_PER_DAY;
   const y0 = totalSiYear / totalCustomUnitsYear; 
 
   const x_len = y0 * (1 + c * Math.cos(nuRad)) / Math.pow(1 + e * Math.cos(nuRad), 2);
 
-  return { nuDeg, e, c, x_len, y0, obliquityDeg: planet.obliquityDeg };
+  return { nuDeg, e, c, x_len, y0, obliquityDeg: EARTH.obliquityDeg };
 }
 
-// --- Geolocational Horizon Engine & Sunrise/Sunset Calculations ---
+// --- Geolocational Horizon Engine (Solar Elevation, Azimuth, Sunrise/Sunset) ---
 function calculateSolarPosition(now, lat, lon) {
   const startOfYear = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
   const dayOfYear = (now - startOfYear) / 86400000;
@@ -121,27 +92,25 @@ function calculateSolarPosition(now, lat, lon) {
   return { elevationDeg, azimuthDeg, declinationRad };
 }
 
-// Calculates exact Sunrise, Sunset, and Solar Noon for the given location/date
 function calculateSunriseSunset(now, lat, lon) {
   const startOfYear = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
   const dayOfYear = (now - startOfYear) / 86400000;
   const declinationRad = 23.44 * (Math.PI / 180) * Math.sin((2 * Math.PI / 365.25) * (dayOfYear - 81));
   const latRad = lat * (Math.PI / 180);
 
-  // Atmospheric refraction angle for standard atmospheric sunset/sunrise (-0.833°)
+  // Atmospheric refraction correction (-0.833°)
   const h0 = -0.833 * (Math.PI / 180);
 
   const cosH = (Math.sin(h0) - Math.sin(latRad) * Math.sin(declinationRad)) / 
                (Math.cos(latRad) * Math.cos(declinationRad));
 
-  // Polar Day / Polar Night checks
   if (cosH > 1) return { sunrise: "Polar Night", sunset: "Polar Night", noon: "12:00:00" };
   if (cosH < -1) return { sunrise: "Midnight Sun", sunset: "Midnight Sun", noon: "12:00:00" };
 
   const hourAngleDeg = Math.acos(cosH) * (180 / Math.PI);
   const hourAngleHours = hourAngleDeg / 15;
 
-  // Solar Noon in Local Time (UTC offset + Longitude correction)
+  // Local Solar Noon
   const tzOffsetHours = -now.getTimezoneOffset() / 60;
   const solarNoonUtc = 12 - (lon / 15);
   let solarNoonLocal = solarNoonUtc + tzOffsetHours;
@@ -173,21 +142,10 @@ function safeSetText(id, text) {
 }
 
 function updateApp() {
-  const currentPerformanceTime = performance.now();
-  const deltaRealMs = currentPerformanceTime - lastRealTime;
-  lastRealTime = currentPerformanceTime;
+  const now = new Date(); // Pure live local clock
+  const params = getDynamicParameters(now);
 
-  if (speedMultiplier === 1 && simOffsetMs === 0) {
-    virtualTimeMs = Date.now();
-  } else {
-    virtualTimeMs += deltaRealMs * speedMultiplier;
-  }
-
-  const now = new Date(virtualTimeMs + simOffsetMs);
-  const planet = PLANET_CONFIGS[currentPlanetKey];
-  const params = getDynamicParameters(now, planet);
-
-  // LOCAL TIME ALIGNMENT
+  // LOCAL TIME ALIGNMENT (Mid-night to Local Device Timezone)
   const startOfLocalToday = new Date(
     now.getFullYear(), 
     now.getMonth(), 
@@ -206,11 +164,11 @@ function updateApp() {
   const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "Local";
   const timeLabelText = `${localTimeString} (${userTz})`;
 
-  const customSecRatio = BASE_UNITS_PER_DAY / planet.solDurationSec;
+  const customSecRatio = BASE_UNITS_PER_DAY / EARTH.solDurationSec;
   const baseUnitsToday = (elapsedSISecondsToday * customSecRatio) / (params.x_len / params.y0);
 
-  // Calendar Engine (360-Day Solar Cycle)
-  const elapsedSISecondsEpoch = (now.getTime() - planet.epochStartUtc) / 1000;
+  // 360-Day Solar Cycle Calendar Engine
+  const elapsedSISecondsEpoch = (now.getTime() - EARTH.epochStartUtc) / 1000;
   const totalCustomUnits = elapsedSISecondsEpoch / params.x_len;
   const totalDays = Math.floor(totalCustomUnits / BASE_UNITS_PER_DAY);
   const year = Math.floor(totalDays / 360) + 1;
@@ -218,25 +176,26 @@ function updateApp() {
   const month = Math.floor(dayOfYear360 / 30) + 1;
   const day = (dayOfYear360 % 30) + 1;
 
-  // Breakdown (° ' '' ''')
+  // Unit Breakdown (° ' '' ''')
   const totalSubUnitsToday = baseUnitsToday * TIERS_PER_BEAT;
   const arcDegree = Math.floor(baseUnitsToday / (PRIMES_PER_ARC * BEATS_PER_PRIME));
   const primeArc = Math.floor((baseUnitsToday % (PRIMES_PER_ARC * BEATS_PER_PRIME)) / BEATS_PER_PRIME);
   const beatArc = Math.floor(baseUnitsToday % BEATS_PER_PRIME);
   const tierArc = Math.floor(totalSubUnitsToday % TIERS_PER_BEAT);
 
-  // Render Core UI
+  // Render Calendar Grid
   safeSetText('cal-year', year);
   safeSetText('cal-month', String(month).padStart(2, '0'));
   safeSetText('cal-day', String(day).padStart(2, '0'));
   renderCalendarGrid(day);
 
+  // Render Primary Digital Display
   safeSetText(
     'custom-time-display', 
     `${String(arcDegree).padStart(2, '0')}° ${String(primeArc).padStart(2, '0')}' ${String(beatArc).padStart(2, '0')}'' ${String(tierArc).padStart(2, '0')}'''`
   );
 
-  // Render Geolocational Horizon & Sunrise/Sunset Data
+  // Render Geolocational Horizon Data & Solar Times
   const solarPos = calculateSolarPosition(now, observerCoords.lat, observerCoords.lon);
   const sunTimes = calculateSunriseSunset(now, observerCoords.lat, observerCoords.lon);
 
@@ -369,21 +328,7 @@ function drawHand(ctx, cx, cy, angle, length, color, width) {
 
 // --- EVENT LISTENERS ---
 document.addEventListener('DOMContentLoaded', () => {
-  const scrubber = document.getElementById('time-scrubber');
-  const offsetDisplay = document.getElementById('offset-days-display');
-  const resetBtn = document.getElementById('reset-time-btn');
-  const speedBtns = document.querySelectorAll('.speed-btn');
-  const planetBtns = document.querySelectorAll('.planet-btn');
   const gpsBtn = document.getElementById('request-gps-btn');
-
-  planetBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      planetBtns.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      currentPlanetKey = btn.dataset.planet;
-      lastActiveDay = -1;
-    });
-  });
 
   if (gpsBtn) {
     gpsBtn.addEventListener('click', () => {
@@ -397,41 +342,12 @@ document.addEventListener('DOMContentLoaded', () => {
             };
           },
           () => {
-            alert("Unable to acquire GPS position. Using default coordinates.");
+            alert("Unable to acquire GPS position. Using Vilnius default coordinates.");
           }
         );
       }
     });
   }
-
-  if (scrubber) {
-    scrubber.addEventListener('input', (e) => {
-      const days = parseInt(e.target.value, 10);
-      simOffsetMs = days * 86400 * 1000;
-      if (offsetDisplay) offsetDisplay.textContent = days;
-    });
-  }
-
-  if (resetBtn) {
-    resetBtn.addEventListener('click', () => {
-      simOffsetMs = 0;
-      speedMultiplier = 1;
-      virtualTimeMs = Date.now();
-      if (scrubber) scrubber.value = 0;
-      if (offsetDisplay) offsetDisplay.textContent = "0";
-      speedBtns.forEach(btn => btn.classList.remove('active'));
-      const defaultSpeedBtn = document.querySelector('.speed-btn[data-speed="1"]');
-      if (defaultSpeedBtn) defaultSpeedBtn.classList.add('active');
-    });
-  }
-
-  speedBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      speedBtns.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      speedMultiplier = parseFloat(btn.dataset.speed);
-    });
-  });
 });
 
 if ('serviceWorker' in navigator) {
