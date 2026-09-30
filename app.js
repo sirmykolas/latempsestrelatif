@@ -141,11 +141,29 @@ function updateApp() {
   const planet = PLANET_CONFIGS[currentPlanetKey];
   const params = getDynamicParameters(now, planet);
 
-  // Local vs UTC Elapsed Time
-  const startOfUTCToday = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const elapsedSISecondsToday = (now.getTime() - startOfUTCToday) / 1000;
+  // --- LOCAL SOLAR TIME ALIGNMENT ---
+  // Midnight timestamp for the local device timezone
+  const startOfLocalToday = new Date(
+    now.getFullYear(), 
+    now.getMonth(), 
+    now.getDate(), 
+    0, 0, 0, 0
+  ).getTime();
 
-  // Dynamic Solar Sub-unit Math
+  // Elapsed real SI seconds since local midnight
+  const elapsedSISecondsToday = (now.getTime() - startOfLocalToday) / 1000;
+
+  // Local Time String for UI Display
+  const localTimeString = now.toLocaleTimeString([], { 
+    hour: '2-digit', 
+    minute: '2-digit', 
+    second: '2-digit', 
+    hour12: false 
+  });
+  const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "Local";
+  const timeLabelText = `${localTimeString} (${userTz})`;
+
+  // Dynamic Solar Sub-unit Math relative to Local Midnight
   const customSecRatio = BASE_UNITS_PER_DAY / planet.solDurationSec;
   const baseUnitsToday = (elapsedSISecondsToday * customSecRatio) / (params.x_len / params.y0);
 
@@ -200,8 +218,7 @@ function updateApp() {
   safeSetText('m-e', params.e.toFixed(6));
   safeSetText('m-obliquity', `${params.obliquityDeg.toFixed(2)}°`);
 
-  const utcTimeString = now.toISOString().split('T')[1].slice(0, 8) + " UTC";
-  safeSetText('utc-time', utcTimeString);
+  safeSetText('utc-time', timeLabelText);
 
   const drift = ((params.x_len - params.y0) / params.y0) * 100;
   safeSetText('drift-rate', `${drift > 0 ? '+' : ''}${drift.toFixed(3)}%`);
