@@ -211,9 +211,3 @@ canvas {
   color: #090d16;
   box-shadow: 0 0 16px var(--accent-glow);
 }
-
-.footer-reference {
-  margin-top: 12px;
-  padding-top: 10px;
-  border-top: 1px dashed rgba(255, 255, 255, 0.08);
-}
