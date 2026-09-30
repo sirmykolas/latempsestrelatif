@@ -1,16 +1,9 @@
 /**
- * Dynamic Solar Arc Engine — 370 / 20 / 72 / 72 Framework
- * Maps solar orbital mechanics directly to:
- * - 370 Days / Cycle
- * - 20 Segments (18.5 days each)
- * - 72 Arcs ("Hours") per day
- * - 72 Beats ("Minutes") per Arc
- * - 72 Pulses ("Seconds") per Beat
+ * Le Temps Céleste Relatif
+ * Direct Solar Longitude Arc Rendering (360° celestial coordinate)
  */
 
 const RAD = Math.PI / 180;
-
-// --- 1. ASTRONOMICAL COMPUTATIONS ---
 
 function getJulianDate(date) {
   return (date.getTime() / 86400000) + 2440587.5;
@@ -64,38 +57,21 @@ function getAbsoluteSolarCoordinates(date) {
   };
 }
 
-// --- 2. 370 / 20 / 72 / 72 CONVERSION LOGIC ---
+// Convert Solar Longitude to Arc Degrees, Minutes, Seconds
+function getArcTime(longitude) {
+  const deg = Math.floor(longitude);
+  const minFull = (longitude - deg) * 60;
+  const min = Math.floor(minFull);
+  const sec = Math.floor((minFull - min) * 60);
 
-function calculate370Time(date, longitude) {
-  // 1. Calculate Day Fraction from local solar time
-  const startOfDay = new Date(date);
-  startOfDay.setHours(0, 0, 0, 0);
-  const dayFraction = (date - startOfDay) / 86400000;
-
-  // 2. Base 72/72 Time Division (72 Arcs x 72 Beats x 72 Pulses = 373,248 total units/day)
-  const totalPulses = dayFraction * (72 * 72 * 72);
-  const arcs = Math.floor(totalPulses / (72 * 72));
-  const beats = Math.floor((totalPulses % (72 * 72)) / 72);
-  const pulses = Math.floor(totalPulses % 72);
-
-  // 3. Calendar Division (370 Days mapped onto 360° orbital longitude)
-  const cycleDay = Math.floor((longitude / 360) * 370) + 1;
-  const segment = Math.floor(((cycleDay - 1) / 370) * 20) + 1;
-
-  return { arcs, beats, pulses, cycleDay, segment };
+  return { deg, min, sec };
 }
-
-// --- 3. UI & RENDER CONTROLLER ---
 
 document.addEventListener('DOMContentLoaded', () => {
   const canvas = document.getElementById('clockCanvas');
   const ctx = canvas.getContext('2d');
 
   const elDigitalTime = document.getElementById('digitalTime');
-  const elSegmentVal  = document.getElementById('segmentVal');
-  const elCycleDayVal = document.getElementById('cycleDayVal');
-  const elGrid        = document.getElementById('calendarGrid');
-
   const elSunLong     = document.getElementById('sunLong');
   const elVsopCorr    = document.getElementById('vsopCorr');
   const elPrecNutCorr = document.getElementById('precNutCorr');
@@ -103,49 +79,24 @@ document.addEventListener('DOMContentLoaded', () => {
   const elStepScale   = document.getElementById('stepScale');
   const btnTheme      = document.getElementById('themeToggle');
 
-  // Build 20 Segment Grid
-  function buildGrid() {
-    elGrid.innerHTML = '';
-    for (let i = 1; i <= 20; i++) {
-      const cell = document.createElement('div');
-      cell.className = 'day-cell';
-      cell.id = `segment-cell-${i}`;
-      cell.textContent = `S${i.toString().padStart(2, '0')}`;
-      elGrid.appendChild(cell);
-    }
-  }
-
   function update() {
     const now = new Date();
     const solar = getAbsoluteSolarCoordinates(now);
-    const t370 = calculate370Time(now, solar.apparentLongitude);
+    const arc = getArcTime(solar.apparentLongitude);
 
-    // Update Digital Time Display (Arcs : Beats : Pulses)
     const fmt = (n) => n.toString().padStart(2, '0');
-    elDigitalTime.textContent = `${fmt(t370.arcs)} : ${fmt(t370.beats)} : ${fmt(t370.pulses)}`;
+    elDigitalTime.textContent = `${fmt(arc.deg)}° ${fmt(arc.min)}′ ${fmt(arc.sec)}″`;
 
-    // Update Calendar Metrics
-    elSegmentVal.textContent = `${t370.segment} / 20`;
-    elCycleDayVal.textContent = `${t370.cycleDay} / 370`;
-
-    // Highlight active segment
-    for (let i = 1; i <= 20; i++) {
-      const cell = document.getElementById(`segment-cell-${i}`);
-      if (cell) cell.classList.toggle('active', i === t370.segment);
-    }
-
-    // Telemetry Dashboard Updates
     elSunLong.textContent = `${solar.apparentLongitude.toFixed(4)}°`;
     elVsopCorr.textContent = `${(solar.vsopPerturbation * 3600).toFixed(2)}″`;
     elPrecNutCorr.textContent = `${(solar.precNutCorrection * 3600).toFixed(2)}″`;
     elDeltaTVal.textContent = `${solar.deltaT.toFixed(2)} s`;
     elStepScale.textContent = `${solar.instantaneousVelocityScale.toFixed(6)}x`;
 
-    // Canvas Graphics Rendering
-    drawClock(ctx, canvas.width, canvas.height, t370.arcs, t370.beats, t370.pulses);
+    drawClock(ctx, canvas.width, canvas.height, solar.apparentLongitude);
   }
 
-  function drawClock(ctx, width, height, arcs, beats, pulses) {
+  function drawClock(ctx, width, height, longitude) {
     ctx.clearRect(0, 0, width, height);
     const cx = width / 2, cy = height / 2;
     const radius = 95;
@@ -161,10 +112,9 @@ document.addEventListener('DOMContentLoaded', () => {
     ctx.lineWidth = 4;
     ctx.stroke();
 
-    // Active Arc Progress (72 Arcs = 360°)
-    const totalArcFraction = (arcs + beats / 72 + pulses / (72 * 72)) / 72;
+    // Arc Progress
     const startAngle = -Math.PI / 2;
-    const endAngle = startAngle + (totalArcFraction * 2 * Math.PI);
+    const endAngle = startAngle + ((longitude / 360) * 2 * Math.PI);
 
     ctx.beginPath();
     ctx.arc(cx, cy, radius, startAngle, endAngle);
@@ -172,7 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ctx.lineWidth = 4;
     ctx.stroke();
 
-    // Dynamic Indicator Node
+    // Node
     const nodeX = cx + radius * Math.cos(endAngle);
     const nodeY = cy + radius * Math.sin(endAngle);
 
@@ -185,7 +135,6 @@ document.addEventListener('DOMContentLoaded', () => {
     ctx.shadowBlur = 0;
   }
 
-  // Theme Controller
   const themes = ['dark', 'daylight', 'twilight'];
   let currentThemeIdx = 0;
 
@@ -195,8 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
     update();
   });
 
-  // Safe Start Loop
-  buildGrid();
+  // Safe Start
   update();
-  setInterval(update, 200); // 200ms updates ensure smooth beat/pulse transitions
+  setInterval(update, 1000);
 });
