@@ -92,7 +92,7 @@ function getDynamicParameters(now, planet) {
   return { nuDeg, e, c, x_len, y0, obliquityDeg: planet.obliquityDeg };
 }
 
-// --- Geolocational Horizon Engine (Solar Elevation & Azimuth) ---
+// --- Geolocational Horizon Engine & Sunrise/Sunset Calculations ---
 function calculateSolarPosition(now, lat, lon) {
   const startOfYear = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
   const dayOfYear = (now - startOfYear) / 86400000;
@@ -107,7 +107,7 @@ function calculateSolarPosition(now, lat, lon) {
 
   const latRad = lat * (Math.PI / 180);
 
-  // Elevation (α) = asin(sin(δ)sin(φ) + cos(δ)cos(φ)cos(H))
+  // Elevation (α)
   const sinEl = Math.sin(declinationRad) * Math.sin(latRad) + 
                 Math.cos(declinationRad) * Math.cos(latRad) * Math.cos(hourAngleRad);
   const elevationDeg = Math.asin(Math.max(-1, Math.min(1, sinEl))) * (180 / Math.PI);
@@ -118,7 +118,53 @@ function calculateSolarPosition(now, lat, lon) {
   let azimuthDeg = Math.acos(Math.max(-1, Math.min(1, cosAz))) * (180 / Math.PI);
   if (Math.sin(hourAngleRad) > 0) azimuthDeg = 360 - azimuthDeg;
 
-  return { elevationDeg, azimuthDeg };
+  return { elevationDeg, azimuthDeg, declinationRad };
+}
+
+// Calculates exact Sunrise, Sunset, and Solar Noon for the given location/date
+function calculateSunriseSunset(now, lat, lon) {
+  const startOfYear = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
+  const dayOfYear = (now - startOfYear) / 86400000;
+  const declinationRad = 23.44 * (Math.PI / 180) * Math.sin((2 * Math.PI / 365.25) * (dayOfYear - 81));
+  const latRad = lat * (Math.PI / 180);
+
+  // Atmospheric refraction angle for standard atmospheric sunset/sunrise (-0.833°)
+  const h0 = -0.833 * (Math.PI / 180);
+
+  const cosH = (Math.sin(h0) - Math.sin(latRad) * Math.sin(declinationRad)) / 
+               (Math.cos(latRad) * Math.cos(declinationRad));
+
+  // Polar Day / Polar Night checks
+  if (cosH > 1) return { sunrise: "Polar Night", sunset: "Polar Night", noon: "12:00:00" };
+  if (cosH < -1) return { sunrise: "Midnight Sun", sunset: "Midnight Sun", noon: "12:00:00" };
+
+  const hourAngleDeg = Math.acos(cosH) * (180 / Math.PI);
+  const hourAngleHours = hourAngleDeg / 15;
+
+  // Solar Noon in Local Time (UTC offset + Longitude correction)
+  const tzOffsetHours = -now.getTimezoneOffset() / 60;
+  const solarNoonUtc = 12 - (lon / 15);
+  let solarNoonLocal = solarNoonUtc + tzOffsetHours;
+  if (solarNoonLocal < 0) solarNoonLocal += 24;
+  if (solarNoonLocal >= 24) solarNoonLocal -= 24;
+
+  const sunriseLocalHours = solarNoonLocal - hourAngleHours;
+  const sunsetLocalHours = solarNoonLocal + hourAngleHours;
+
+  function formatDecimalHours(dec) {
+    let h = Math.floor(dec);
+    let m = Math.floor((dec - h) * 60);
+    let s = Math.floor((((dec - h) * 60) - m) * 60);
+    if (h < 0) h += 24;
+    if (h >= 24) h -= 24;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+
+  return {
+    sunrise: formatDecimalHours(sunriseLocalHours),
+    sunset: formatDecimalHours(sunsetLocalHours),
+    noon: formatDecimalHours(solarNoonLocal)
+  };
 }
 
 function safeSetText(id, text) {
@@ -141,8 +187,7 @@ function updateApp() {
   const planet = PLANET_CONFIGS[currentPlanetKey];
   const params = getDynamicParameters(now, planet);
 
-  // --- LOCAL SOLAR TIME ALIGNMENT ---
-  // Midnight timestamp for the local device timezone
+  // LOCAL TIME ALIGNMENT
   const startOfLocalToday = new Date(
     now.getFullYear(), 
     now.getMonth(), 
@@ -150,10 +195,8 @@ function updateApp() {
     0, 0, 0, 0
   ).getTime();
 
-  // Elapsed real SI seconds since local midnight
   const elapsedSISecondsToday = (now.getTime() - startOfLocalToday) / 1000;
 
-  // Local Time String for UI Display
   const localTimeString = now.toLocaleTimeString([], { 
     hour: '2-digit', 
     minute: '2-digit', 
@@ -163,7 +206,6 @@ function updateApp() {
   const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "Local";
   const timeLabelText = `${localTimeString} (${userTz})`;
 
-  // Dynamic Solar Sub-unit Math relative to Local Midnight
   const customSecRatio = BASE_UNITS_PER_DAY / planet.solDurationSec;
   const baseUnitsToday = (elapsedSISecondsToday * customSecRatio) / (params.x_len / params.y0);
 
@@ -194,11 +236,15 @@ function updateApp() {
     `${String(arcDegree).padStart(2, '0')}° ${String(primeArc).padStart(2, '0')}' ${String(beatArc).padStart(2, '0')}'' ${String(tierArc).padStart(2, '0')}'''`
   );
 
-  // Render Geolocational Horizon Data
+  // Render Geolocational Horizon & Sunrise/Sunset Data
   const solarPos = calculateSolarPosition(now, observerCoords.lat, observerCoords.lon);
+  const sunTimes = calculateSunriseSunset(now, observerCoords.lat, observerCoords.lon);
+
   safeSetText('geo-coords-text', `${observerCoords.lat.toFixed(2)}°, ${observerCoords.lon.toFixed(2)}° (${observerCoords.source})`);
-  safeSetText('geo-elevation-text', `${solarPos.elevationDeg.toFixed(2)}°`);
-  safeSetText('geo-azimuth-text', `${solarPos.azimuthDeg.toFixed(2)}°`);
+  safeSetText('geo-sunrise-text', sunTimes.sunrise);
+  safeSetText('geo-sunset-text', sunTimes.sunset);
+  safeSetText('geo-noon-text', sunTimes.noon);
+  safeSetText('geo-elevation-text', `${solarPos.elevationDeg.toFixed(2)}° / ${solarPos.azimuthDeg.toFixed(2)}°`);
 
   let horizonState = "🌌 Night (Sub-horizon)";
   if (solarPos.elevationDeg > 0) {
@@ -330,17 +376,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const planetBtns = document.querySelectorAll('.planet-btn');
   const gpsBtn = document.getElementById('request-gps-btn');
 
-  // Planet Switcher
   planetBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       planetBtns.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       currentPlanetKey = btn.dataset.planet;
-      lastActiveDay = -1; // Force calendar grid re-render
+      lastActiveDay = -1;
     });
   });
 
-  // GPS Location Trigger
   if (gpsBtn) {
     gpsBtn.addEventListener('click', () => {
       if (navigator.geolocation) {
