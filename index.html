@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>La Temps Terrestre Relatif — 370 System</title>
+  <title>Le Temps Céleste Relatif</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
@@ -12,35 +12,21 @@
 <body>
 
   <header>
-    <h1>La Temps Terrestre Relatif</h1>
-    <p class="subtitle">370 / 20 / 72 / 72 Dynamic Solar System</p>
+    <h1>Le Temps Céleste Relatif</h1>
+    <p class="subtitle">Dynamic Solar Arc System</p>
   </header>
 
   <main class="container">
-    <!-- Clock Display Card -->
     <div class="card clock-container">
-      <h2>Solar Arc Coordinates</h2>
+      <h2>Solar Longitude Arc</h2>
       <canvas id="clockCanvas" width="280" height="280"></canvas>
-      <div id="digitalTime" class="digital-time">00 : 00 : 00</div>
+      <div id="digitalTime" class="digital-time">00° 00′ 00″</div>
     </div>
 
-    <!-- Calendar Card -->
     <div class="card">
-      <h2>370-Day Cycle Matrix</h2>
-      <div class="calendar-header">
-        <span>Segment: <strong id="segmentVal">-- / 20</strong></span>
-        <span>Cycle Day: <strong id="cycleDayVal">-- / 370</strong></span>
-      </div>
-      <div id="calendarGrid" class="calendar-grid">
-        <!-- 20 Segment cells generated dynamically -->
-      </div>
-    </div>
-
-    <!-- Telemetry Card -->
-    <div class="card">
-      <h2>Astronomical Telemetry</h2>
+      <h2>Astronomical Position</h2>
       <div class="metric-row">
-        <span class="metric-label">Solar Longitude (λ)</span>
+        <span class="metric-label">Apparent Solar Longitude (λ)</span>
         <span id="sunLong" class="metric-value highlight">0.0000°</span>
       </div>
       <div class="metric-row">
@@ -48,15 +34,15 @@
         <span id="vsopCorr" class="metric-value">0.00″</span>
       </div>
       <div class="metric-row">
-        <span class="metric-label">Precession / Nutation</span>
+        <span class="metric-label">Precession & Nutation</span>
         <span id="precNutCorr" class="metric-value">0.00″</span>
       </div>
       <div class="metric-row">
-        <span class="metric-label">Applied Delta T (ΔT)</span>
+        <span class="metric-label">Delta T (ΔT)</span>
         <span id="deltaTVal" class="metric-value">0.00 s</span>
       </div>
       <div class="metric-row">
-        <span class="metric-label">Orbital Speed Scale</span>
+        <span class="metric-label">Orbital Velocity Scale</span>
         <span id="stepScale" class="metric-value highlight">1.000000x</span>
       </div>
       
