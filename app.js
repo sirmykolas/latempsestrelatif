@@ -1,28 +1,49 @@
-// --- System Constants ---
-const EPOCH_START_UTC = Date.UTC(2026, 0, 1, 0, 0, 0); // Jan 1, 2026
-const PERIHELION_DAY_OF_YEAR = 3;
+// --- Planetary Body Configurations ---
+const PLANET_CONFIGS = {
+  earth: {
+    name: "Earth",
+    eccentricity: 0.0167086,
+    obliquityDeg: 23.44,
+    perihelionDay: 3,
+    orbitDays: 365.25,
+    solDurationSec: 86400,
+    epochStartUtc: Date.UTC(2026, 0, 1, 0, 0, 0)
+  },
+  mars: {
+    name: "Mars",
+    eccentricity: 0.0934000,
+    obliquityDeg: 25.19,
+    perihelionDay: 160,
+    orbitDays: 686.98,
+    solDurationSec: 88642.66, // 24h 39m 35.244s
+    epochStartUtc: Date.UTC(2026, 0, 1, 0, 0, 0)
+  },
+  venus: {
+    name: "Venus",
+    eccentricity: 0.0067720,
+    obliquityDeg: 177.36, // Retrograde rotation
+    perihelionDay: 50,
+    orbitDays: 224.70,
+    solDurationSec: 10087200, // Solar day ~116.75 Earth days
+    epochStartUtc: Date.UTC(2026, 0, 1, 0, 0, 0)
+  }
+};
 
-const PRIMARY_ARCS = 20;         // 20 Primary Arcs (°) [10 Day / 10 Night]
-const PRIMES_PER_ARC = 72;       // 72 Primes (') per Arc
-const BEATS_PER_PRIME = 72;      // 72 Beats ('') per Prime
-const TIERS_PER_BEAT = 72;       // 72 Tiers (''') per Beat (Sub-second resolution)
+let currentPlanetKey = "earth";
 
-// Total sub-units per day: 20 * 72 * 72 * 72 = 7,464,960
-const TOTAL_SUBUNITS_PER_DAY = PRIMARY_ARCS * PRIMES_PER_ARC * BEATS_PER_PRIME * TIERS_PER_BEAT;
-const BASE_UNITS_PER_DAY = PRIMARY_ARCS * PRIMES_PER_ARC * BEATS_PER_PRIME; // 103,680 units
+// --- System Sub-unit Constants ---
+const PRIMARY_ARCS = 20;
+const PRIMES_PER_ARC = 72;
+const BEATS_PER_PRIME = 72;
+const TIERS_PER_BEAT = 72;
 
-// Roman Numerals for 20 Primary Solar Arcs (XX at Nadir/Midnight, X at Zenith/Noon)
+const BASE_UNITS_PER_DAY = PRIMARY_ARCS * PRIMES_PER_ARC * BEATS_PER_PRIME; // 103,680
+
 const ROMAN_ARCS = [
   "XX", "I", "II", "III", "IV", "V", 
   "VI", "VII", "VIII", "IX", "X", 
   "XI", "XII", "XIII", "XIV", "XV", 
   "XVI", "XVII", "XVIII", "XIX"
-];
-
-const LUNAR_PHASES = [
-  "🌑 New Moon", "🌒 Waxing Crescent", "🌓 First Quarter", 
-  "🌔 Waxing Gibbous", "🌕 Full Moon", "🌖 Waning Gibbous", 
-  "🌗 Last Quarter", "🌘 Waning Crescent"
 ];
 
 // --- Simulation State ---
@@ -31,31 +52,27 @@ let speedMultiplier = 1;
 let lastRealTime = performance.now();
 let virtualTimeMs = Date.now();
 
-// --- Newton-Raphson Kepler Solver ---
+// Default coordinates: Vilnius, Lithuania (54.6872° N, 25.2798° E)
+let observerCoords = { lat: 54.6872, lon: 25.2798, source: "Default (Vilnius)" };
+
+// --- Keplerian Solver ---
 function solveKepler(M, e) {
   let E = M;
   const tolerance = 1e-8;
-  const maxIterations = 100;
-
-  for (let i = 0; i < maxIterations; i++) {
+  for (let i = 0; i < 100; i++) {
     const f = E - e * Math.sin(E) - M;
     if (Math.abs(f) < tolerance) break;
-    const fPrime = 1 - e * Math.cos(E);
-    E = E - f / fPrime;
+    E = E - f / (1 - e * Math.cos(E));
   }
   return E;
 }
 
-function getDynamicParameters(now) {
+function getDynamicParameters(now, planet) {
   const startOfYear = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
   const dayOfYear = (now - startOfYear) / 86400000;
   
-  const M_rad = ((dayOfYear - PERIHELION_DAY_OF_YEAR) / 365.25) * 2 * Math.PI;
-
-  const e_0 = 0.0167086;
-  const t_years = (now.getTime() - EPOCH_START_UTC) / (365.25 * 86400000 * 1000);
-  const e = e_0 + 0.00005 * Math.cos(2 * Math.PI * t_years / 11.86);
-
+  const M_rad = ((dayOfYear - planet.perihelionDay) / planet.orbitDays) * 2 * Math.PI;
+  const e = planet.eccentricity;
   const E_rad = solveKepler(M_rad, e);
 
   const tanHalfNu = Math.sqrt((1 + e) / (1 - e)) * Math.tan(E_rad / 2);
@@ -63,32 +80,45 @@ function getDynamicParameters(now) {
   if (nuRad < 0) nuRad += 2 * Math.PI;
   const nuDeg = (nuRad * 180 / Math.PI) % 360;
 
-  const obliquityRad = 23.44 * (Math.PI / 180);
+  const obliquityRad = planet.obliquityDeg * (Math.PI / 180);
   const c = e * Math.cos(obliquityRad);
 
-  const SI_SECONDS_PER_360_YEAR = 365.25 * 86400;
-  const TOTAL_CUSTOM_SECS_PER_YEAR = 360 * BASE_UNITS_PER_DAY;
-  const y0 = SI_SECONDS_PER_360_YEAR / TOTAL_CUSTOM_SECS_PER_YEAR; 
+  const totalSiYear = planet.orbitDays * planet.solDurationSec;
+  const totalCustomUnitsYear = 360 * BASE_UNITS_PER_DAY;
+  const y0 = totalSiYear / totalCustomUnitsYear; 
 
   const x_len = y0 * (1 + c * Math.cos(nuRad)) / Math.pow(1 + e * Math.cos(nuRad), 2);
 
-  return { nuDeg, e, c, x_len, y0 };
+  return { nuDeg, e, c, x_len, y0, obliquityDeg: planet.obliquityDeg };
 }
 
-function getNextAstronomicalEvent(nuDeg) {
-  const events = [
-    { name: "Vernal Equinox", deg: 78.0 },
-    { name: "Summer Solstice", deg: 168.0 },
-    { name: "Autumnal Equinox", deg: 258.0 },
-    { name: "Winter Solstice", deg: 348.0 }
-  ];
+// --- Geolocational Horizon Engine (Solar Elevation & Azimuth) ---
+function calculateSolarPosition(now, lat, lon) {
+  const startOfYear = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
+  const dayOfYear = (now - startOfYear) / 86400000;
 
-  for (let event of events) {
-    if (nuDeg < event.deg) {
-      return { event: event.name, remainingDeg: event.deg - nuDeg };
-    }
-  }
-  return { event: "Vernal Equinox", remainingDeg: (360 - nuDeg) + 78.0 };
+  // Solar Declination Angle (δ)
+  const declinationRad = 23.44 * (Math.PI / 180) * Math.sin((2 * Math.PI / 365.25) * (dayOfYear - 81));
+
+  // Local Hour Angle (H)
+  const utcHours = now.getUTCHours() + now.getUTCMinutes() / 60 + now.getUTCSeconds() / 3600;
+  const lst = (utcHours * 15 + lon) % 360; // Local Sidereal Time in degrees
+  const hourAngleRad = (lst - 180) * (Math.PI / 180);
+
+  const latRad = lat * (Math.PI / 180);
+
+  // Elevation (α) = asin(sin(δ)sin(φ) + cos(δ)cos(φ)cos(H))
+  const sinEl = Math.sin(declinationRad) * Math.sin(latRad) + 
+                Math.cos(declinationRad) * Math.cos(latRad) * Math.cos(hourAngleRad);
+  const elevationDeg = Math.asin(Math.max(-1, Math.min(1, sinEl))) * (180 / Math.PI);
+
+  // Azimuth (A)
+  const cosAz = (Math.sin(declinationRad) - Math.sin(latRad) * sinEl) / 
+                (Math.cos(latRad) * Math.cos(Math.asin(sinEl)));
+  let azimuthDeg = Math.acos(Math.max(-1, Math.min(1, cosAz))) * (180 / Math.PI);
+  if (Math.sin(hourAngleRad) > 0) azimuthDeg = 360 - azimuthDeg;
+
+  return { elevationDeg, azimuthDeg };
 }
 
 function safeSetText(id, text) {
@@ -108,37 +138,19 @@ function updateApp() {
   }
 
   const now = new Date(virtualTimeMs + simOffsetMs);
-  const params = getDynamicParameters(now);
+  const planet = PLANET_CONFIGS[currentPlanetKey];
+  const params = getDynamicParameters(now, planet);
 
-  // --- LOCAL vs UTC TIME ---
-  let elapsedSISecondsToday;
-  let timeLabelText = "";
+  // Local vs UTC Elapsed Time
+  const startOfUTCToday = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const elapsedSISecondsToday = (now.getTime() - startOfUTCToday) / 1000;
 
-  try {
-    const tzOffsetMs = now.getTimezoneOffset() * 60 * 1000;
-    const localNow = new Date(now.getTime() - tzOffsetMs);
-    const startOfLocalToday = Date.UTC(
-      localNow.getUTCFullYear(), 
-      localNow.getUTCMonth(), 
-      localNow.getUTCDate()
-    );
-    elapsedSISecondsToday = (localNow.getTime() - startOfLocalToday) / 1000;
-
-    const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "Local";
-    const localTimeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    timeLabelText = `${localTimeString} (${userTz})`;
-  } catch (e) {
-    const startOfUTCToday = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-    elapsedSISecondsToday = (now.getTime() - startOfUTCToday) / 1000;
-    timeLabelText = now.toUTCString().split(' ')[4] + " UTC";
-  }
-
-  // Pure Solar Coordinate Math
-  const customSecRatio = BASE_UNITS_PER_DAY / 86400;
+  // Dynamic Solar Sub-unit Math
+  const customSecRatio = BASE_UNITS_PER_DAY / planet.solDurationSec;
   const baseUnitsToday = (elapsedSISecondsToday * customSecRatio) / (params.x_len / params.y0);
 
-  // Calendar Math
-  const elapsedSISecondsEpoch = (now.getTime() - EPOCH_START_UTC) / 1000;
+  // Calendar Engine (360-Day Solar Cycle)
+  const elapsedSISecondsEpoch = (now.getTime() - planet.epochStartUtc) / 1000;
   const totalCustomUnits = elapsedSISecondsEpoch / params.x_len;
   const totalDays = Math.floor(totalCustomUnits / BASE_UNITS_PER_DAY);
   const year = Math.floor(totalDays / 360) + 1;
@@ -146,55 +158,53 @@ function updateApp() {
   const month = Math.floor(dayOfYear360 / 30) + 1;
   const day = (dayOfYear360 % 30) + 1;
 
-  // Breakdown into 4 Celestial Tiers (° ' '' ''')
+  // Breakdown (° ' '' ''')
   const totalSubUnitsToday = baseUnitsToday * TIERS_PER_BEAT;
-  
   const arcDegree = Math.floor(baseUnitsToday / (PRIMES_PER_ARC * BEATS_PER_PRIME));
   const primeArc = Math.floor((baseUnitsToday % (PRIMES_PER_ARC * BEATS_PER_PRIME)) / BEATS_PER_PRIME);
   const beatArc = Math.floor(baseUnitsToday % BEATS_PER_PRIME);
   const tierArc = Math.floor(totalSubUnitsToday % TIERS_PER_BEAT);
 
-  // --- RENDER UI ---
+  // Render Core UI
   safeSetText('cal-year', year);
   safeSetText('cal-month', String(month).padStart(2, '0'));
   safeSetText('cal-day', String(day).padStart(2, '0'));
   renderCalendarGrid(day);
 
-  // Pure Celestial Coordinate Display (° ' '' ''')
   safeSetText(
     'custom-time-display', 
     `${String(arcDegree).padStart(2, '0')}° ${String(primeArc).padStart(2, '0')}' ${String(beatArc).padStart(2, '0')}'' ${String(tierArc).padStart(2, '0')}'''`
   );
 
+  // Render Geolocational Horizon Data
+  const solarPos = calculateSolarPosition(now, observerCoords.lat, observerCoords.lon);
+  safeSetText('geo-coords-text', `${observerCoords.lat.toFixed(2)}°, ${observerCoords.lon.toFixed(2)}° (${observerCoords.source})`);
+  safeSetText('geo-elevation-text', `${solarPos.elevationDeg.toFixed(2)}°`);
+  safeSetText('geo-azimuth-text', `${solarPos.azimuthDeg.toFixed(2)}°`);
+
+  let horizonState = "🌌 Night (Sub-horizon)";
+  if (solarPos.elevationDeg > 0) {
+    horizonState = "☀️ Daylight (Above Horizon)";
+    document.body.setAttribute('data-theme', 'daylight');
+  } else if (solarPos.elevationDeg > -6) {
+    horizonState = "🌅 Civil Twilight";
+    document.body.setAttribute('data-theme', 'twilight');
+  } else {
+    document.body.removeAttribute('data-theme');
+  }
+  safeSetText('geo-state-text', horizonState);
+
+  // Render Kepler Metrics
   safeSetText('m-nu', `${params.nuDeg.toFixed(2)}°`);
   safeSetText('m-xlen', `${params.x_len.toFixed(5)} s`);
   safeSetText('m-e', params.e.toFixed(6));
-  safeSetText('m-c', params.c.toFixed(6));
+  safeSetText('m-obliquity', `${params.obliquityDeg.toFixed(2)}°`);
 
-  safeSetText('utc-time', timeLabelText);
+  const utcTimeString = now.toISOString().split('T')[1].slice(0, 8) + " UTC";
+  safeSetText('utc-time', utcTimeString);
 
   const drift = ((params.x_len - params.y0) / params.y0) * 100;
   safeSetText('drift-rate', `${drift > 0 ? '+' : ''}${drift.toFixed(3)}%`);
-
-  // Render Lunar Phase
-  const lunarIndex = Math.min(Math.floor(((day - 1) / 30) * LUNAR_PHASES.length), LUNAR_PHASES.length - 1);
-  safeSetText('lunar-phase-text', LUNAR_PHASES[lunarIndex]);
-
-  // Render Solstice / Equinox Event
-  const astroEvent = getNextAstronomicalEvent(params.nuDeg);
-  safeSetText('astro-event-text', `Next: ${astroEvent.event} (${astroEvent.remainingDeg.toFixed(1)}° away)`);
-
-  // Solar Horizon Theme Mapping (10° = Zenith / High Noon)
-  if (arcDegree >= 5 && arcDegree < 15) {
-    document.body.setAttribute('data-theme', 'daylight');
-    safeSetText('solar-phase-text', '☀️ Solar Zenith Arc (Day)');
-  } else if (arcDegree === 4 || arcDegree === 15) {
-    document.body.setAttribute('data-theme', 'twilight');
-    safeSetText('solar-phase-text', '🌅 Twilight Arc Shift');
-  } else {
-    document.body.removeAttribute('data-theme');
-    safeSetText('solar-phase-text', '🌌 Nadir Arc (Night)');
-  }
 
   drawAnalogClock(arcDegree, primeArc, beatArc);
 
@@ -266,9 +276,8 @@ function drawAnalogClock(arc, prime, beat) {
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    const numRadius = radius - 20;
-    const nx = cx + Math.cos(angle) * numRadius;
-    const ny = cy + Math.sin(angle) * numRadius;
+    const nx = cx + Math.cos(angle) * (radius - 20);
+    const ny = cy + Math.sin(angle) * (radius - 20);
     ctx.fillText(ROMAN_ARCS[i], nx, ny);
   }
 
@@ -301,6 +310,38 @@ document.addEventListener('DOMContentLoaded', () => {
   const offsetDisplay = document.getElementById('offset-days-display');
   const resetBtn = document.getElementById('reset-time-btn');
   const speedBtns = document.querySelectorAll('.speed-btn');
+  const planetBtns = document.querySelectorAll('.planet-btn');
+  const gpsBtn = document.getElementById('request-gps-btn');
+
+  // Planet Switcher
+  planetBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      planetBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentPlanetKey = btn.dataset.planet;
+      lastActiveDay = -1; // Force calendar grid re-render
+    });
+  });
+
+  // GPS Location Trigger
+  if (gpsBtn) {
+    gpsBtn.addEventListener('click', () => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            observerCoords = {
+              lat: pos.coords.latitude,
+              lon: pos.coords.longitude,
+              source: "GPS Live"
+            };
+          },
+          () => {
+            alert("Unable to acquire GPS position. Using default coordinates.");
+          }
+        );
+      }
+    });
+  }
 
   if (scrubber) {
     scrubber.addEventListener('input', (e) => {
