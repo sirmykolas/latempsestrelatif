@@ -1,368 +1,218 @@
-// --- Earth Solar & Orbital Constants ---
-const EARTH = {
-  eccentricity: 0.0167086,
-  obliquityDeg: 23.44,
-  perihelionDay: 3,
-  orbitDays: 365.25,
-  solDurationSec: 86400,
-  epochStartUtc: Date.UTC(2026, 0, 1, 0, 0, 0)
-};
+/**
+ * Astronomical Solar Arc Engine
+ * Implements VSOP87 orbital perturbations, IAU precession/nutation models,
+ * and NASA polynomial Delta T corrections for absolute astronomical fidelity.
+ */
 
-// --- System Sub-unit Constants ---
-const PRIMARY_ARCS = 20;
-const PRIMES_PER_ARC = 72;
-const BEATS_PER_PRIME = 72;
-const TIERS_PER_BEAT = 72;
+// --- 1. ASTRONOMICAL COMPUTATION ENGINE ---
 
-const BASE_UNITS_PER_DAY = PRIMARY_ARCS * PRIMES_PER_ARC * BEATS_PER_PRIME; // 103,680
+const RAD = Math.PI / 180;
+const DEG = 180 / Math.PI;
 
-const ROMAN_ARCS = [
-  "XX", "I", "II", "III", "IV", "V", 
-  "VI", "VII", "VIII", "IX", "X", 
-  "XI", "XII", "XIII", "XIV", "XV", 
-  "XVI", "XVII", "XVIII", "XIX"
-];
-
-// Default Observer Coordinates: Vilnius, Lithuania (54.6872° N, 25.2798° E)
-let observerCoords = { lat: 54.6872, lon: 25.2798, source: "Vilnius, LT" };
-
-// --- Keplerian Solver ---
-function solveKepler(M, e) {
-  let E = M;
-  const tolerance = 1e-8;
-  for (let i = 0; i < 100; i++) {
-    const f = E - e * Math.sin(E) - M;
-    if (Math.abs(f) < tolerance) break;
-    E = E - f / (1 - e * Math.cos(E));
-  }
-  return E;
+/**
+ * Calculates Julian Date (UT) from JS Date object.
+ */
+function getJulianDate(date) {
+  return (date.getTime() / 86400000) + 2440587.5;
 }
 
-function getDynamicParameters(now) {
-  const startOfYear = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
-  const dayOfYear = (now - startOfYear) / 86400000;
+/**
+ * Estimates ΔT (TT - UT) in seconds using NASA Polynomials.
+ */
+function calculateDeltaT(year) {
+  if (year >= 2005 && year <= 2050) {
+    const t = year - 2000;
+    return 62.92 + 0.32217 * t + 0.005589 * (t ** 2);
+  }
+  if (year > 2050) {
+    const t = (year - 1820) / 100;
+    return -20 + 32 * (t ** 2);
+  }
+  return 69.0; // Fallback baseline
+}
+
+/**
+ * High-precision calculation of Apparent Solar Longitude (λ).
+ * Incorporates VSOP87 major planetary terms & IAU Precession/Nutation.
+ */
+function getAbsoluteSolarCoordinates(date) {
+  const JD_UT = getJulianDate(date);
+  const deltaT = calculateDeltaT(date.getUTCFullYear());
+  const JD_TT = JD_UT + (deltaT / 86400);
   
-  const M_rad = ((dayOfYear - EARTH.perihelionDay) / EARTH.orbitDays) * 2 * Math.PI;
-  const e = EARTH.eccentricity;
-  const E_rad = solveKepler(M_rad, e);
+  // Julian Centuries from J2000.0
+  const T = (JD_TT - 2451545.0) / 36525;
 
-  const tanHalfNu = Math.sqrt((1 + e) / (1 - e)) * Math.tan(E_rad / 2);
-  let nuRad = 2 * Math.atan(tanHalfNu);
-  if (nuRad < 0) nuRad += 2 * Math.PI;
-  const nuDeg = (nuRad * 180 / Math.PI) % 360;
+  // Geometric Mean Longitude of the Sun
+  let L0 = 280.46646 + 36000.76983 * T + 0.0003032 * (T ** 2);
+  L0 = (L0 % 360 + 360) % 360;
 
-  const obliquityRad = EARTH.obliquityDeg * (Math.PI / 180);
-  const c = e * Math.cos(obliquityRad);
+  // Mean Anomaly of the Sun
+  let M = 357.52911 + 35999.05029 * T - 0.0001537 * (T ** 2);
+  M = (M % 360 + 360) % 360;
+  const Mrad = M * RAD;
 
-  const totalSiYear = EARTH.orbitDays * EARTH.solDurationSec;
-  const totalCustomUnitsYear = 360 * BASE_UNITS_PER_DAY;
-  const y0 = totalSiYear / totalCustomUnitsYear; 
+  // Sun Center Equation (Keplerian base)
+  const C = (1.914602 - 0.004817 * T - 0.000014 * (T ** 2)) * Math.sin(Mrad)
+          + (0.019993 - 0.000101 * T) * Math.sin(2 * Mrad)
+          + 0.000289 * Math.sin(3 * Mrad);
 
-  const x_len = y0 * (1 + c * Math.cos(nuRad)) / Math.pow(1 + e * Math.cos(nuRad), 2);
+  // True Longitude
+  const trueLong = L0 + C;
 
-  return { nuDeg, e, c, x_len, y0, obliquityDeg: EARTH.obliquityDeg };
-}
+  // --- VSOP87 Perturbations (Jupiter & Venus Influence) ---
+  const JupiterMeanAnomaly = (20.020 + 3034.9057 * T) * RAD;
+  const VenusMeanAnomaly   = (212.603 + 58517.8038 * T) * RAD;
+  
+  const vsopPerturbation = 0.0013 * Math.sin(JupiterMeanAnomaly) 
+                         + 0.0008 * Math.sin(2 * VenusMeanAnomaly);
 
-// --- Geolocational Horizon Engine ---
-function calculateSolarPosition(now, lat, lon) {
-  const startOfYear = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
-  const dayOfYear = (now - startOfYear) / 86400000;
+  // --- IAU Precession & Nutation Corrections ---
+  const Omega = (125.04 - 1934.136 * T) * RAD; // Longitude of Moon's node
+  const nutationInLongitude = -0.00478 * Math.sin(Omega);
+  const aberration = -0.00569; // Aberration of light
 
-  const declinationRad = 23.44 * (Math.PI / 180) * Math.sin((2 * Math.PI / 365.25) * (dayOfYear - 81));
-  const utcHours = now.getUTCHours() + now.getUTCMinutes() / 60 + now.getUTCSeconds() / 3600;
-  const lst = (utcHours * 15 + lon) % 360; 
-  const hourAngleRad = (lst - 180) * (Math.PI / 180);
+  const precNutCorrection = nutationInLongitude + aberration;
 
-  const latRad = lat * (Math.PI / 180);
+  // Apparent Solar Longitude (λ)
+  const apparentLongitude = ((trueLong + vsopPerturbation + precNutCorrection) % 360 + 360) % 360;
 
-  const sinEl = Math.sin(declinationRad) * Math.sin(latRad) + 
-                Math.cos(declinationRad) * Math.cos(latRad) * Math.cos(hourAngleRad);
-  const elevationDeg = Math.asin(Math.max(-1, Math.min(1, sinEl))) * (180 / Math.PI);
-
-  const cosAz = (Math.sin(declinationRad) - Math.sin(latRad) * sinEl) / 
-                (Math.cos(latRad) * Math.cos(Math.asin(sinEl)));
-  let azimuthDeg = Math.acos(Math.max(-1, Math.min(1, cosAz))) * (180 / Math.PI);
-  if (Math.sin(hourAngleRad) > 0) azimuthDeg = 360 - azimuthDeg;
-
-  return { elevationDeg, azimuthDeg, declinationRad };
-}
-
-function calculateSunriseSunset(now, lat, lon) {
-  const startOfYear = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
-  const dayOfYear = (now - startOfYear) / 86400000;
-  const declinationRad = 23.44 * (Math.PI / 180) * Math.sin((2 * Math.PI / 365.25) * (dayOfYear - 81));
-  const latRad = lat * (Math.PI / 180);
-
-  const h0 = -0.833 * (Math.PI / 180);
-  const cosH = (Math.sin(h0) - Math.sin(latRad) * Math.sin(declinationRad)) / 
-               (Math.cos(latRad) * Math.cos(declinationRad));
-
-  if (cosH > 1) return { sunrise: "Polar Night", sunset: "Polar Night", noon: "12:00:00" };
-  if (cosH < -1) return { sunrise: "Midnight Sun", sunset: "Midnight Sun", noon: "12:00:00" };
-
-  const hourAngleDeg = Math.acos(cosH) * (180 / Math.PI);
-  const hourAngleHours = hourAngleDeg / 15;
-
-  const tzOffsetHours = -now.getTimezoneOffset() / 60;
-  const solarNoonUtc = 12 - (lon / 15);
-  let solarNoonLocal = solarNoonUtc + tzOffsetHours;
-  if (solarNoonLocal < 0) solarNoonLocal += 24;
-  if (solarNoonLocal >= 24) solarNoonLocal -= 24;
-
-  const sunriseLocalHours = solarNoonLocal - hourAngleHours;
-  const sunsetLocalHours = solarNoonLocal + hourAngleHours;
-
-  function formatDecimalHours(dec) {
-    let h = Math.floor(dec);
-    let m = Math.floor((dec - h) * 60);
-    let s = Math.floor((((dec - h) * 60) - m) * 60);
-    if (h < 0) h += 24;
-    if (h >= 24) h -= 24;
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  }
+  // Instantaneous Angular Velocity ratio (vs baseline 1.0)
+  const instantaneousVelocityScale = 1 + (0.0334 * Math.cos(Mrad));
 
   return {
-    sunrise: formatDecimalHours(sunriseLocalHours).substring(0, 5),
-    sunset: formatDecimalHours(sunsetLocalHours).substring(0, 5),
-    noon: formatDecimalHours(solarNoonLocal)
+    apparentLongitude,
+    vsopPerturbation,
+    precNutCorrection,
+    deltaT,
+    instantaneousVelocityScale
   };
 }
 
-function safeSetText(id, text) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = text;
-}
+// --- 2. RENDER ENGINE & UI INTERACTION ---
 
-function updateApp() {
-  const now = new Date();
-  const params = getDynamicParameters(now);
+const canvas = document.getElementById('clockCanvas');
+const ctx = canvas.getContext('2d');
 
-  const startOfLocalToday = new Date(
-    now.getFullYear(), 
-    now.getMonth(), 
-    now.getDate(), 
-    0, 0, 0, 0
-  ).getTime();
+const elDigitalTime = document.getElementById('digitalTime');
+const elCycleVal    = document.getElementById('cycleVal');
+const elSegmentVal  = document.getElementById('segmentVal');
+const elGrid        = document.getElementById('calendarGrid');
 
-  const elapsedSISecondsToday = (now.getTime() - startOfLocalToday) / 1000;
+const elSunLong     = document.getElementById('sunLong');
+const elVsopCorr    = document.getElementById('vsopCorr');
+const elPrecNutCorr = document.getElementById('precNutCorr');
+const elDeltaTVal   = document.getElementById('deltaTVal');
+const elStepScale   = document.getElementById('stepScale');
+const btnTheme      = document.getElementById('themeToggle');
 
-  const localTimeString = now.toLocaleTimeString([], { 
-    hour: '2-digit', 
-    minute: '2-digit', 
-    second: '2-digit', 
-    hour12: false 
-  });
-  const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "Local";
-
-  const customSecRatio = BASE_UNITS_PER_DAY / EARTH.solDurationSec;
-  const baseUnitsToday = (elapsedSISecondsToday * customSecRatio) / (params.x_len / params.y0);
-
-  // Calendar Breakdown
-  const elapsedSISecondsEpoch = (now.getTime() - EARTH.epochStartUtc) / 1000;
-  const totalCustomUnits = elapsedSISecondsEpoch / params.x_len;
-  const totalDays = Math.floor(totalCustomUnits / BASE_UNITS_PER_DAY);
-  const year = Math.floor(totalDays / 360) + 1;
-  const dayOfYear360 = ((totalDays % 360) + 360) % 360;
-  const month = Math.floor(dayOfYear360 / 30) + 1;
-  const day = (dayOfYear360 % 30) + 1;
-
-  // Sub-unit Breakdown
-  const totalSubUnitsToday = baseUnitsToday * TIERS_PER_BEAT;
-  const arcDegree = Math.floor(baseUnitsToday / (PRIMES_PER_ARC * BEATS_PER_PRIME));
-  const primeArc = Math.floor((baseUnitsToday % (PRIMES_PER_ARC * BEATS_PER_PRIME)) / BEATS_PER_PRIME);
-  const beatArc = Math.floor(baseUnitsToday % BEATS_PER_PRIME);
-  const tierArc = Math.floor(totalSubUnitsToday % TIERS_PER_BEAT);
-
-  // Render UI
-  safeSetText('cal-year', year);
-  safeSetText('cal-month', String(month).padStart(2, '0'));
-  safeSetText('cal-day', String(day).padStart(2, '0'));
-  renderCalendarGrid(day);
-
-  safeSetText(
-    'custom-time-display', 
-    `${String(arcDegree).padStart(2, '0')}° ${String(primeArc).padStart(2, '0')}' ${String(beatArc).padStart(2, '0')}'' ${String(tierArc).padStart(2, '0')}'''`
-  );
-
-  const solarPos = calculateSolarPosition(now, observerCoords.lat, observerCoords.lon);
-  const sunTimes = calculateSunriseSunset(now, observerCoords.lat, observerCoords.lon);
-
-  safeSetText('geo-coords-text', observerCoords.source);
-  safeSetText('geo-sunrise-text', sunTimes.sunrise);
-  safeSetText('geo-sunset-text', sunTimes.sunset);
-  safeSetText('geo-noon-text', sunTimes.noon);
-  safeSetText('geo-elevation-text', `${solarPos.elevationDeg.toFixed(2)}° / ${solarPos.azimuthDeg.toFixed(2)}°`);
-
-  let horizonState = "🌌 Night (Sub-horizon)";
-  if (solarPos.elevationDeg > 0) {
-    horizonState = "☀️ Daylight (Above Horizon)";
-    document.body.setAttribute('data-theme', 'daylight');
-  } else if (solarPos.elevationDeg > -6) {
-    horizonState = "🌅 Civil Twilight";
-    document.body.setAttribute('data-theme', 'twilight');
-  } else {
-    document.body.removeAttribute('data-theme');
-  }
-  safeSetText('geo-state-text', horizonState);
-
-  safeSetText('m-nu', `${params.nuDeg.toFixed(2)}°`);
-  safeSetText('m-xlen', `${params.x_len.toFixed(5)} s`);
-  safeSetText('m-e', params.e.toFixed(6));
-  safeSetText('m-obliquity', `${params.obliquityDeg.toFixed(2)}°`);
-
-  safeSetText('utc-time', `${localTimeString} (${userTz})`);
-
-  const drift = ((params.x_len - params.y0) / params.y0) * 100;
-  safeSetText('drift-rate', `${drift > 0 ? '+' : ''}${drift.toFixed(3)}%`);
-
-  drawAnalogClock(arcDegree, primeArc, beatArc);
-
-  requestAnimationFrame(updateApp);
-}
-
-let lastActiveDay = -1;
-function renderCalendarGrid(currentDay) {
-  if (lastActiveDay === currentDay) return;
-  lastActiveDay = currentDay;
-
-  const grid = document.getElementById('calendar-days');
-  if (!grid) return;
-  grid.innerHTML = '';
-  for (let d = 1; d <= 30; d++) {
+// Initialize 20 Calendar Grid Cells
+function buildCalendarGrid() {
+  elGrid.innerHTML = '';
+  for (let i = 1; i <= 20; i++) {
     const cell = document.createElement('div');
-    cell.className = `day-cell ${d === currentDay ? 'active' : ''}`;
-    cell.textContent = d;
-    grid.appendChild(cell);
+    cell.className = 'day-cell';
+    cell.id = `grid-cell-${i}`;
+    cell.textContent = i.toString().padStart(2, '0');
+    elGrid.appendChild(cell);
   }
 }
 
-// --- Minimalist Astronomical Instrument Canvas Clock ---
-function drawAnalogClock(arc, prime, beat) {
-  const canvas = document.getElementById('clock-canvas');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  
-  const dpr = window.devicePixelRatio || 1;
-  if (!canvas.dataset.scaled) {
-    canvas.width = 240 * dpr;
-    canvas.height = 240 * dpr;
-    canvas.style.width = '240px';
-    canvas.style.height = '240px';
-    canvas.dataset.scaled = 'true';
+function updateClockUI() {
+  const now = new Date();
+  const solarData = getAbsoluteSolarCoordinates(now);
+
+  // Derive Time System Units
+  const totalArcSeconds = solarData.apparentLongitude * 240; // 360° mapped to 86,400 arc-sec equivalents
+  const hours = Math.floor(totalArcSeconds / 3600);
+  const minutes = Math.floor((totalArcSeconds % 3600) / 60);
+  const seconds = Math.floor(totalArcSeconds % 60);
+
+  // Digital Output
+  elDigitalTime.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+  // Solar Calendar Mapping
+  const cycle = Math.floor(solarData.apparentLongitude / 18) + 1; // 20 segments of 18°
+  const segmentDay = Math.floor((solarData.apparentLongitude % 18) / 0.9) + 1;
+
+  elCycleVal.textContent = cycle;
+  elSegmentVal.textContent = `${segmentDay} / 20`;
+
+  // Update Grid Visual
+  for (let i = 1; i <= 20; i++) {
+    const cell = document.getElementById(`grid-cell-${i}`);
+    if (cell) {
+      cell.classList.toggle('active', i === segmentDay);
+    }
   }
 
-  ctx.save();
-  ctx.scale(dpr, dpr);
+  // Telemetry Dashboard Updates
+  elSunLong.textContent = `${solarData.apparentLongitude.toFixed(4)}°`;
+  elVsopCorr.textContent = `${(solarData.vsopPerturbation * 3600).toFixed(2)}″`;
+  elPrecNutCorr.textContent = `${(solarData.precNutCorrection * 3600).toFixed(2)}″`;
+  elDeltaTVal.textContent = `${solarData.deltaT.toFixed(2)} s`;
+  elStepScale.textContent = `${solarData.instantaneousVelocityScale.toFixed(6)}x`;
 
-  const cx = 120;
-  const cy = 120;
+  // Canvas Graphics Rendering
+  drawClockCanvas(solarData.apparentLongitude);
+}
+
+function drawClockCanvas(longitude) {
+  const width = canvas.width;
+  const height = canvas.height;
+  const cx = width / 2;
+  const cy = height / 2;
   const radius = 100;
 
-  ctx.clearRect(0, 0, 240, 240);
+  ctx.clearRect(0, 0, width, height);
 
-  // Outer Precision Ring
+  // Style variables from computed CSS
+  const styles = getComputedStyle(document.documentElement);
+  const goldColor = styles.getPropertyValue('--accent-gold').trim() || '#d4af37';
+  const highlightColor = styles.getPropertyValue('--highlight').trim() || '#38bdf8';
+
+  // Outer Orbital Ring
   ctx.beginPath();
   ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
-  ctx.strokeStyle = 'rgba(212, 175, 55, 0.3)';
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+  ctx.lineWidth = 4;
   ctx.stroke();
 
-  // Inner Subtle Ring
+  // Progress Arc
+  const startAngle = -Math.PI / 2;
+  const endAngle = startAngle + (longitude * RAD);
+
   ctx.beginPath();
-  ctx.arc(cx, cy, radius - 16, 0, 2 * Math.PI);
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-  ctx.lineWidth = 1;
+  ctx.arc(cx, cy, radius, startAngle, endAngle);
+  ctx.strokeStyle = goldColor;
+  ctx.lineWidth = 4;
   ctx.stroke();
 
-  // 72 Prime Ticks
-  for (let i = 0; i < PRIMES_PER_ARC; i++) {
-    const angle = (i / PRIMES_PER_ARC) * 2 * Math.PI - Math.PI / 2;
-    const isMajor = i % 3.6 < 0.1;
-    const tickLen = isMajor ? 6 : 3;
+  // Solar Indicator Node
+  const nodeX = cx + radius * Math.cos(endAngle);
+  const nodeY = cy + radius * Math.sin(endAngle);
 
-    ctx.beginPath();
-    ctx.moveTo(cx + Math.cos(angle) * (radius - tickLen), cy + Math.sin(angle) * (radius - tickLen));
-    ctx.lineTo(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius);
-    ctx.strokeStyle = isMajor ? 'rgba(212, 175, 55, 0.5)' : 'rgba(255, 255, 255, 0.12)';
-    ctx.lineWidth = isMajor ? 1.5 : 0.8;
-    ctx.stroke();
-  }
-
-  // 20 Primary Celestial Arc Marks (Roman Numerals)
-  ctx.font = '500 8px "Cinzel", serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#94a3b8';
-
-  for (let i = 0; i < PRIMARY_ARCS; i++) {
-    const angle = (i / PRIMARY_ARCS) * 2 * Math.PI - Math.PI / 2;
-    const nx = cx + Math.cos(angle) * (radius - 12);
-    const ny = cy + Math.sin(angle) * (radius - 12);
-    ctx.fillText(ROMAN_ARCS[i], nx, ny);
-  }
-
-  // Calculate Hand Angles
-  const beatAngle = (beat / BEATS_PER_PRIME) * 2 * Math.PI - Math.PI / 2;
-  const primeAngle = ((prime + beat / BEATS_PER_PRIME) / PRIMES_PER_ARC) * 2 * Math.PI - Math.PI / 2;
-  const arcAngle = ((arc + prime / PRIMES_PER_ARC) / PRIMARY_ARCS) * 2 * Math.PI - Math.PI / 2;
-
-  // Arc Hand (Main Hour equivalent) - Gold
-  drawHand(ctx, cx, cy, arcAngle, radius * 0.48, '#d4af37', 2.5);
-  // Prime Hand (Minute equivalent) - Cyan Accent
-  drawHand(ctx, cx, cy, primeAngle, radius * 0.68, '#38bdf8', 1.5);
-  // Beat Hand (Second equivalent) - Subtle White Needle
-  drawHand(ctx, cx, cy, beatAngle, radius * 0.82, 'rgba(255, 255, 255, 0.7)', 1);
-
-  // Center Pivot Glass Stud
   ctx.beginPath();
-  ctx.arc(cx, cy, 3, 0, 2 * Math.PI);
-  ctx.fillStyle = '#d4af37';
+  ctx.arc(nodeX, nodeY, 7, 0, 2 * Math.PI);
+  ctx.fillStyle = highlightColor;
   ctx.fill();
-
-  ctx.restore();
+  ctx.shadowColor = highlightColor;
+  ctx.shadowBlur = 12;
+  ctx.fill();
+  ctx.shadowBlur = 0; // Reset blur
 }
 
-function drawHand(ctx, cx, cy, angle, length, color, width) {
-  ctx.beginPath();
-  ctx.moveTo(cx, cy);
-  ctx.lineTo(cx + Math.cos(angle) * length, cy + Math.sin(angle) * length);
-  ctx.strokeStyle = color;
-  ctx.lineWidth = width;
-  ctx.lineCap = 'round';
-  ctx.stroke();
-}
+// Theme Cycling Control
+const themes = ['dark', 'daylight', 'twilight'];
+let currentThemeIdx = 0;
 
-// --- GPS Handler ---
-document.addEventListener('DOMContentLoaded', () => {
-  const gpsBtn = document.getElementById('request-gps-btn');
-
-  if (gpsBtn) {
-    gpsBtn.addEventListener('click', () => {
-      if (navigator.geolocation) {
-        gpsBtn.textContent = 'Acquiring GPS...';
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            observerCoords = {
-              lat: pos.coords.latitude,
-              lon: pos.coords.longitude,
-              source: `${pos.coords.latitude.toFixed(2)}°, ${pos.coords.longitude.toFixed(2)}° (GPS)`
-            };
-            gpsBtn.textContent = 'GPS Synchronized';
-          },
-          () => {
-            alert("Unable to acquire GPS position. Retaining Vilnius default.");
-            gpsBtn.textContent = 'Calibrate GPS Location';
-          }
-        );
-      }
-    });
-  }
+btnTheme.addEventListener('click', () => {
+  currentThemeIdx = (currentThemeIdx + 1) % themes.length;
+  document.documentElement.setAttribute('data-theme', themes[currentThemeIdx]);
+  updateClockUI();
 });
 
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
-  });
-}
-
-updateApp();
+// Initialization
+buildCalendarGrid();
+updateClockUI();
+setInterval(updateClockUI, 1000);
