@@ -1,5 +1,5 @@
 // --- System Constants ---
-const EPOCH_START_UTC = Date.UTC(2026, 0, 1, 0, 0, 0); // Jan 1, 2026 00:00:00 UTC
+const EPOCH_START_UTC = Date.UTC(2026, 0, 1, 0, 0, 0); // Jan 1, 2026
 const PERIHELION_DAY_OF_YEAR = 3;
 
 const HOURS_PER_DAY = 20;
@@ -7,7 +7,6 @@ const MINS_PER_HOUR = 72;
 const SECS_PER_MIN = 72;
 const TOTAL_CUSTOM_SECS_PER_DAY = HOURS_PER_DAY * MINS_PER_HOUR * SECS_PER_MIN; // 103,680 custom secs/day
 
-// Roman numerals for 20 custom hours (0 / 20 at top is XX)
 const ROMAN_HOURS = [
   "XX", "I", "II", "III", "IV", "V", 
   "VI", "VII", "VIII", "IX", "X", 
@@ -15,23 +14,52 @@ const ROMAN_HOURS = [
   "XVI", "XVII", "XVIII", "XIX"
 ];
 
-// Lunar Phases across 30-day Month
 const LUNAR_PHASES = [
   "🌑 New Moon", "🌒 Waxing Crescent", "🌓 First Quarter", 
   "🌔 Waxing Gibbous", "🌕 Full Moon", "🌖 Waning Gibbous", 
   "🌗 Last Quarter", "🌘 Waning Crescent"
 ];
 
+// --- Simulation State ---
+let simOffsetMs = 0;
+let speedMultiplier = 1;
+let lastRealTime = performance.now();
+let virtualTimeMs = Date.now();
+
+// --- Newton-Raphson Kepler Equation Solver ---
+function solveKepler(M, e) {
+  let E = M; // Initial guess
+  const tolerance = 1e-8;
+  const maxIterations = 100;
+
+  for (let i = 0; i < maxIterations; i++) {
+    const f = E - e * Math.sin(E) - M;
+    if (Math.abs(f) < tolerance) break;
+    const fPrime = 1 - e * Math.cos(E);
+    E = E - f / fPrime;
+  }
+  return E;
+}
+
 function getDynamicParameters(now) {
   const startOfYear = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
   const dayOfYear = (now - startOfYear) / 86400000;
   
-  const nuRad = ((dayOfYear - PERIHELION_DAY_OF_YEAR) / 365.25) * 2 * Math.PI;
-  const nuDeg = ((nuRad * 180 / Math.PI) + 360) % 360;
+  // Mean Anomaly (M)
+  const M_rad = ((dayOfYear - PERIHELION_DAY_OF_YEAR) / 365.25) * 2 * Math.PI;
 
   const e_0 = 0.0167086;
   const t_years = (now.getTime() - EPOCH_START_UTC) / (365.25 * 86400000 * 1000);
   const e = e_0 + 0.00005 * Math.cos(2 * Math.PI * t_years / 11.86);
+
+  // Solves Kepler's Equation for exact Eccentric Anomaly (E)
+  const E_rad = solveKepler(M_rad, e);
+
+  // Computes exact True Anomaly (nu) from Eccentric Anomaly
+  const tanHalfNu = Math.sqrt((1 + e) / (1 - e)) * Math.tan(E_rad / 2);
+  let nuRad = 2 * Math.atan(tanHalfNu);
+  if (nuRad < 0) nuRad += 2 * Math.PI;
+  const nuDeg = (nuRad * 180 / Math.PI) % 360;
 
   const obliquityRad = 23.44 * (Math.PI / 180);
   const c = e * Math.cos(obliquityRad);
@@ -55,8 +83,7 @@ function getNextAstronomicalEvent(nuDeg) {
 
   for (let event of events) {
     if (nuDeg < event.deg) {
-      const remainingDeg = event.deg - nuDeg;
-      return { event: event.name, remainingDeg };
+      return { event: event.name, remainingDeg: event.deg - nuDeg };
     }
   }
   return { event: "Vernal Equinox", remainingDeg: (360 - nuDeg) + 78.0 };
@@ -68,10 +95,21 @@ function safeSetText(id, text) {
 }
 
 function updateApp() {
-  const now = new Date();
+  const currentPerformanceTime = performance.now();
+  const deltaRealMs = currentPerformanceTime - lastRealTime;
+  lastRealTime = currentPerformanceTime;
+
+  // Apply speed multiplier to time tracking
+  if (speedMultiplier === 1 && simOffsetMs === 0) {
+    virtualTimeMs = Date.now();
+  } else {
+    virtualTimeMs += deltaRealMs * speedMultiplier;
+  }
+
+  const now = new Date(virtualTimeMs + simOffsetMs);
   const params = getDynamicParameters(now);
 
-  // --- LOCAL vs UTC TIME HANDLING ---
+  // --- LOCAL vs UTC TIME ---
   let elapsedSISecondsToday;
   let timeLabelText = "";
 
@@ -94,11 +132,11 @@ function updateApp() {
     timeLabelText = now.toUTCString().split(' ')[4] + " UTC";
   }
 
-  // 1. Custom Time Calculation
+  // Custom Time Math
   const customSecRatio = TOTAL_CUSTOM_SECS_PER_DAY / 86400;
   const secondsToday = (elapsedSISecondsToday * customSecRatio) / (params.x_len / params.y0);
 
-  // 2. Calendar Math
+  // Calendar Math
   const elapsedSISecondsEpoch = (now.getTime() - EPOCH_START_UTC) / 1000;
   const totalCustomSeconds = elapsedSISecondsEpoch / params.x_len;
   const totalDays = Math.floor(totalCustomSeconds / TOTAL_CUSTOM_SECS_PER_DAY);
@@ -107,7 +145,7 @@ function updateApp() {
   const month = Math.floor(dayOfYear360 / 30) + 1;
   const day = (dayOfYear360 % 30) + 1;
 
-  // 3. Time Breakdown (20h / 72m / 72s)
+  // Breakdown
   const customHours = Math.floor(secondsToday / (MINS_PER_HOUR * SECS_PER_MIN));
   const customMins = Math.floor((secondsToday % (MINS_PER_HOUR * SECS_PER_MIN)) / SECS_PER_MIN);
   const customSecs = Math.floor(secondsToday % SECS_PER_MIN);
@@ -138,7 +176,19 @@ function updateApp() {
   const astroEvent = getNextAstronomicalEvent(params.nuDeg);
   safeSetText('astro-event-text', `Next: ${astroEvent.event} (${astroEvent.remainingDeg.toFixed(1)}° away)`);
 
-  // Draw Clock Canvas
+  // Dynamic Solar Horizon / UI Twilight Phase
+  const hourFraction = customHours / HOURS_PER_DAY;
+  if (hourFraction >= 0.25 && hourFraction <= 0.75) {
+    document.body.setAttribute('data-theme', 'daylight');
+    safeSetText('solar-phase-text', '☀️ Solar Zenith');
+  } else if ((hourFraction > 0.20 && hourFraction < 0.25) || (hourFraction > 0.75 && hourFraction < 0.80)) {
+    document.body.setAttribute('data-theme', 'twilight');
+    safeSetText('solar-phase-text', '🌅 Solar Twilight');
+  } else {
+    document.body.removeAttribute('data-theme');
+    safeSetText('solar-phase-text', '🌌 Deep Cosmic Night');
+  }
+
   drawAnalogClock(customHours, customMins, customSecs);
 
   requestAnimationFrame(updateApp);
@@ -237,6 +287,43 @@ function drawHand(ctx, cx, cy, angle, length, color, width) {
   ctx.lineWidth = width;
   ctx.stroke();
 }
+
+// --- EVENT LISTENERS FOR TIME TRAVEL & SPEED CONTROLS ---
+document.addEventListener('DOMContentLoaded', () => {
+  const scrubber = document.getElementById('time-scrubber');
+  const offsetDisplay = document.getElementById('offset-days-display');
+  const resetBtn = document.getElementById('reset-time-btn');
+  const speedBtns = document.querySelectorAll('.speed-btn');
+
+  if (scrubber) {
+    scrubber.addEventListener('input', (e) => {
+      const days = parseInt(e.target.value, 10);
+      simOffsetMs = days * 86400 * 1000;
+      if (offsetDisplay) offsetDisplay.textContent = days;
+    });
+  }
+
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      simOffsetMs = 0;
+      speedMultiplier = 1;
+      virtualTimeMs = Date.now();
+      if (scrubber) scrubber.value = 0;
+      if (offsetDisplay) offsetDisplay.textContent = "0";
+      speedBtns.forEach(btn => btn.classList.remove('active'));
+      const defaultSpeedBtn = document.querySelector('.speed-btn[data-speed="1"]');
+      if (defaultSpeedBtn) defaultSpeedBtn.classList.add('active');
+    });
+  }
+
+  speedBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      speedBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      speedMultiplier = parseFloat(btn.dataset.speed);
+    });
+  });
+});
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
