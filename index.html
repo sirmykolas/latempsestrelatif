@@ -12,23 +12,23 @@
   <div class="container">
     <header>
       <h1>360-Day Astronomical Era</h1>
-      <p class="subtitle">Relativistic Astronomical Time Engine</p>
+      <p class="subtitle">Relativistic Celestial Coordinate Engine</p>
     </header>
 
     <!-- Custom Calendar Card -->
     <div class="card">
-      <h2>Custom Calendar</h2>
+      <h2>360-Day Solar Cycle</h2>
       <div class="calendar-header">
         <div class="cal-unit">
-          <span class="cal-label">YEAR</span>
+          <span class="cal-label">ERA YEAR</span>
           <span id="cal-year" class="cal-value">1</span>
         </div>
         <div class="cal-unit">
-          <span class="cal-label">MONTH</span>
+          <span class="cal-label">CYCLE</span>
           <span id="cal-month" class="cal-value">01</span>
         </div>
         <div class="cal-unit">
-          <span class="cal-label">DAY</span>
+          <span class="cal-label">SOLAR DAY</span>
           <span id="cal-day" class="cal-value">01</span>
         </div>
       </div>
@@ -37,22 +37,22 @@
 
     <!-- Astronomical Dial Card -->
     <div class="card">
-      <h2>Astronomical Dial</h2>
+      <h2>Celestial Solar Dial</h2>
       <div class="clock-container">
         <canvas id="clock-canvas" width="300" height="300"></canvas>
       </div>
-      <div id="custom-time-display" class="digital-time">00° 00' 00''</div>
+      <div id="custom-time-display" class="digital-time">00° 00' 00'' 00'''</div>
     </div>
 
     <!-- Time-Travel & Simulation Controls -->
     <div class="card">
-      <h2>Time Travel & Simulation Engine</h2>
+      <h2>Simulation & Offset Control</h2>
       <div class="control-group">
-        <label for="time-scrubber">Scrub Time Offset:</label>
+        <label for="time-scrubber">Orbit Offset Scrub (Days):</label>
         <input type="range" id="time-scrubber" min="-180" max="180" value="0" step="1">
         <div class="control-readout">
           <span>Offset: <strong id="offset-days-display">0</strong> Days</span>
-          <button id="reset-time-btn" class="btn">Reset to Live Time</button>
+          <button id="reset-time-btn" class="btn">Reset to Live Solar Coordinates</button>
         </div>
       </div>
       <div class="control-group" style="margin-top: 12px;">
@@ -78,20 +78,20 @@
         <span id="astro-event-text" class="metric-value">Calculating...</span>
       </div>
       <div class="metric-row">
-        <span>Solar Horizon Position:</span>
-        <span id="solar-phase-text" class="metric-value">Night Sky</span>
+        <span>Solar Horizon Arc:</span>
+        <span id="solar-phase-text" class="metric-value">0° Nadir Arc</span>
       </div>
     </div>
 
     <!-- Dynamic Formula Metrics Card -->
     <div class="card">
-      <h2>Dynamic Formula Metrics</h2>
+      <h2>Keplerian Dynamic Metrics</h2>
       <div class="metric-row">
         <span>True Anomaly (ν - Kepler):</span>
         <span id="m-nu" class="metric-value">0.00°</span>
       </div>
       <div class="metric-row">
-        <span>Dynamic Unit Step Length (x):</span>
+        <span>Dynamic Step Length (x):</span>
         <span id="m-xlen" class="metric-value">1.00000 s</span>
       </div>
       <div class="metric-row">
@@ -104,19 +104,19 @@
       </div>
       <hr class="divider">
       <div class="metric-row">
-        <span>Atomic Clock Comparison:</span>
+        <span>Atomic Comparison:</span>
       </div>
       <div class="metric-row">
-        <span>Reference Local/UTC Time:</span>
+        <span>Local Horizon Reference:</span>
         <span id="utc-time" class="metric-value">00:00:00 UTC</span>
       </div>
       <div class="metric-row">
-        <span>Drift Rate vs SI Second:</span>
+        <span>Relativistic Drift Rate:</span>
         <span id="drift-rate" class="metric-value">0.00%</span>
       </div>
     </div>
   </div>
 
-  <script src="app.js?v=6.0"></script>
+  <script src="app.js?v=7.0"></script>
 </body>
 </html>
