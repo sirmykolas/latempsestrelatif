@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Astronomical Solar Arc Clock</title>
+  <title>La Temps Terrestre Relatif — 370 System</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
@@ -12,51 +12,51 @@
 <body>
 
   <header>
-    <h1>Astronomical Solar Clock</h1>
-    <p class="subtitle">High-Precision Dynamic Solar Arc System</p>
+    <h1>La Temps Terrestre Relatif</h1>
+    <p class="subtitle">370 / 20 / 72 / 72 Dynamic Solar System</p>
   </header>
 
   <main class="container">
-    <!-- Clock Visualizer Card -->
+    <!-- Clock Display Card -->
     <div class="card clock-container">
       <h2>Solar Arc Coordinates</h2>
       <canvas id="clockCanvas" width="280" height="280"></canvas>
-      <div id="digitalTime" class="digital-time">00:00:00</div>
+      <div id="digitalTime" class="digital-time">00 : 00 : 00</div>
     </div>
 
     <!-- Calendar Card -->
     <div class="card">
-      <h2>Solar Cycle Calendar</h2>
+      <h2>370-Day Cycle Matrix</h2>
       <div class="calendar-header">
-        <span>Cycle: <strong id="cycleVal">--</strong></span>
-        <span>Segment: <strong id="segmentVal">--</strong></span>
+        <span>Segment: <strong id="segmentVal">-- / 20</strong></span>
+        <span>Cycle Day: <strong id="cycleDayVal">-- / 370</strong></span>
       </div>
       <div id="calendarGrid" class="calendar-grid">
-        <!-- Cells generated dynamically -->
+        <!-- 20 Segment cells generated dynamically -->
       </div>
     </div>
 
-    <!-- Astronomical Metrics Card -->
+    <!-- Telemetry Card -->
     <div class="card">
       <h2>Astronomical Telemetry</h2>
       <div class="metric-row">
-        <span class="metric-label">Apparent Solar Longitude (λ)</span>
+        <span class="metric-label">Solar Longitude (λ)</span>
         <span id="sunLong" class="metric-value highlight">0.0000°</span>
       </div>
       <div class="metric-row">
-        <span class="metric-label">VSOP87 Planetary Perturbation</span>
-        <span id="vsopCorr" class="metric-value">0.0000°</span>
+        <span class="metric-label">VSOP87 Perturbation</span>
+        <span id="vsopCorr" class="metric-value">0.00″</span>
       </div>
       <div class="metric-row">
-        <span class="metric-label">Precession & Nutation Correction</span>
-        <span id="precNutCorr" class="metric-value">0.0000°</span>
+        <span class="metric-label">Precession / Nutation</span>
+        <span id="precNutCorr" class="metric-value">0.00″</span>
       </div>
       <div class="metric-row">
         <span class="metric-label">Applied Delta T (ΔT)</span>
         <span id="deltaTVal" class="metric-value">0.00 s</span>
       </div>
       <div class="metric-row">
-        <span class="metric-label">Dynamic Time Step Scaling</span>
+        <span class="metric-label">Orbital Speed Scale</span>
         <span id="stepScale" class="metric-value highlight">1.000000x</span>
       </div>
       
