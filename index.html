@@ -3,84 +3,94 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
-  <!-- Prevent Aggressive Mobile Caching -->
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
-
-  <title>Kimtys-Judeikis Astronomical Time & Calendar System</title>
-  <link rel="stylesheet" href="style.css?v=1.1">
+  <title>Le Temps Etoile Relatif</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f172a">
 </head>
 <body>
   <div class="container">
     <header>
-      <h1>Kimtys-Judeikis Clock & Calendar</h1>
-      <p class="subtitle">360-Day Astronomical Era — Year 1</p>
+      <h1>360-Day Astronomical Era</h1>
+      <p class="subtitle">Relativistic Astronomical Time Engine</p>
     </header>
 
-    <div class="grid">
-      <!-- Calendar View -->
-      <div class="card calendar-card">
-        <h2>Custom Calendar</h2>
-        <div class="calendar-header">
-          <div class="stat-box">
-            <span class="label">YEAR</span>
-            <span class="val" id="cal-year">1</span>
-          </div>
-          <div class="stat-box">
-            <span class="label">MONTH</span>
-            <span class="val" id="cal-month">01</span>
-          </div>
-          <div class="stat-box">
-            <span class="label">DAY</span>
-            <span class="val" id="cal-day">01</span>
-          </div>
+    <!-- Custom Calendar Card -->
+    <div class="card">
+      <h2>Custom Calendar</h2>
+      <div class="calendar-header">
+        <div class="cal-unit">
+          <span class="cal-label">YEAR</span>
+          <span id="cal-year" class="cal-value">1</span>
         </div>
-        <div class="calendar-grid" id="calendar-days"></div>
+        <div class="cal-unit">
+          <span class="cal-label">MONTH</span>
+          <span id="cal-month" class="cal-value">01</span>
+        </div>
+        <div class="cal-unit">
+          <span class="cal-label">DAY</span>
+          <span id="cal-day" class="cal-value">01</span>
+        </div>
       </div>
+      <div id="calendar-days" class="calendar-grid"></div>
+    </div>
 
-      <!-- Analog Visual Clock -->
-      <div class="card clock-card">
-        <h2>Astronomical Dial</h2>
-        <canvas id="clock-canvas" width="280" height="280"></canvas>
-        <div class="digital-time" id="custom-time-display">00:00:00</div>
+    <!-- Astronomical Dial Card -->
+    <div class="card">
+      <h2>Astronomical Dial</h2>
+      <div class="clock-container">
+        <canvas id="clock-canvas" width="300" height="300"></canvas>
       </div>
+      <div id="custom-time-display" class="digital-time">00:00:00</div>
+    </div>
 
-      <!-- Live Formula Metrics -->
-      <div class="card metrics-card">
-        <h2>Dynamic Formula Metrics</h2>
-        <div class="metric">
-          <span>True Anomaly (ν):</span>
-          <strong id="m-nu">0.00°</strong>
-        </div>
-        <div class="metric">
-          <span>Dynamic Second Length (x):</span>
-          <strong id="m-xlen">1.00000 s</strong>
-        </div>
-        <div class="metric">
-          <span>Eccentricity (e):</span>
-          <strong id="m-e">0.01671</strong>
-        </div>
-        <div class="metric">
-          <span>Modulation Factor (c):</span>
-          <strong id="m-c">0.01533</strong>
-        </div>
-        <hr>
-        <h3>Atomic Clock Comparison</h3>
-        <div class="metric">
-          <span>UTC Atomic Time:</span>
-          <strong id="utc-time">00:00:00 UTC</strong>
-        </div>
-        <div class="metric">
-          <span>Drift Rate vs SI Second:</span>
-          <strong id="drift-rate">0.00%</strong>
-        </div>
+    <!-- Astronomical Cycles Card -->
+    <div class="card">
+      <h2>Astronomical Cycles</h2>
+      <div class="metric-row">
+        <span>Lunar Phase (30-day cycle):</span>
+        <span id="lunar-phase-text" class="metric-value">🌑 New Moon</span>
+      </div>
+      <div class="metric-row">
+        <span>Seasonal Alignment:</span>
+        <span id="astro-event-text" class="metric-value">Calculating...</span>
+      </div>
+    </div>
+
+    <!-- Dynamic Formula Metrics Card -->
+    <div class="card">
+      <h2>Dynamic Formula Metrics</h2>
+      <div class="metric-row">
+        <span>True Anomaly (ν):</span>
+        <span id="m-nu" class="metric-value">0.00°</span>
+      </div>
+      <div class="metric-row">
+        <span>Dynamic Second Length (x):</span>
+        <span id="m-xlen" class="metric-value">1.00000 s</span>
+      </div>
+      <div class="metric-row">
+        <span>Eccentricity (e):</span>
+        <span id="m-e" class="metric-value">0.016709</span>
+      </div>
+      <div class="metric-row">
+        <span>Modulation Factor (c):</span>
+        <span id="m-c" class="metric-value">0.015330</span>
+      </div>
+      <hr class="divider">
+      <div class="metric-row">
+        <span>Atomic Clock Comparison:</span>
+      </div>
+      <div class="metric-row">
+        <span>Reference Local/UTC Time:</span>
+        <span id="utc-time" class="metric-value">00:00:00 UTC</span>
+      </div>
+      <div class="metric-row">
+        <span>Drift Rate vs SI Second:</span>
+        <span id="drift-rate" class="metric-value">0.00%</span>
       </div>
     </div>
   </div>
 
-  <!-- Version query ?v=2.2 forces browser to reload script -->
-  <script src="app.js?v=2.2"></script>
+  <script src="app.js?v=3.0"></script>
 </body>
 </html>
